@@ -12,12 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Send message to active tab
         chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
             try {
-                // Ensure content script is injected before sending message
-                await chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    files: ['content.js']
-                });
-                
                 await chrome.tabs.sendMessage(tabs[0].id, {
                     action: 'toggleSelection',
                     enabled: isActive
