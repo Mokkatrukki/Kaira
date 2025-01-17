@@ -2,6 +2,39 @@ if (window.hasRun === true) {
     console.log('Content script already loaded');
 } else {
     window.hasRun = true;
+
+    // Storage management functions
+    const StorageManager = {
+        async saveElements(url, selectors) {
+            try {
+                if (selectors.length > 0) {
+                    console.log('Saving selectors:', selectors);
+                    await chrome.storage.local.set({ [url]: selectors });
+                }
+            } catch (err) {
+                console.error('Error saving elements:', err);
+            }
+        },
+
+        async getElements(url) {
+            try {
+                const data = await chrome.storage.local.get(url);
+                return data[url] || [];
+            } catch (err) {
+                console.error('Error getting elements:', err);
+                return [];
+            }
+        },
+
+        async clearElements(url) {
+            try {
+                await chrome.storage.local.remove(url);
+            } catch (err) {
+                console.error('Error clearing elements:', err);
+            }
+        }
+    };
+
     let selectionEnabled = false;
     let clickedElements = new Set();
     console.log('Content script loaded');
@@ -15,9 +48,7 @@ if (window.hasRun === true) {
     // Updated restore function with retry mechanism
     async function restoreClickedElements(retryCount = 0) {
         try {
-            const data = await chrome.storage.local.get(window.location.href);
-            console.log('Restored data:', data);
-            const storedSelectors = data[window.location.href] || [];
+            const storedSelectors = await StorageManager.getElements(window.location.href);
             
             let foundElements = 0;
             // Filter out empty or invalid selectors
@@ -169,27 +200,16 @@ if (window.hasRun === true) {
 
     // Add new function to update storage
     async function updateStorage() {
-        try {
-            const selectors = Array.from(clickedElements)
-                .map(el => getElementCSSSelector(el))
-                .filter(selector => selector && selector.trim()); // Filter out empty selectors
-            
-            if (selectors.length > 0) {
-                console.log('Saving selectors:', selectors);
-                await chrome.storage.local.set({ [window.location.href]: selectors });
-                // Verify storage
-                const saved = await chrome.storage.local.get(window.location.href);
-                console.log('Verified saved data:', saved);
-            }
-        } catch (err) {
-            console.error('Error updating storage:', err);
-        }
+        const selectors = Array.from(clickedElements)
+            .map(el => getElementCSSSelector(el))
+            .filter(selector => selector && selector.trim());
+        await StorageManager.saveElements(window.location.href, selectors);
     }
 
     // Add new function to handle clearing
     async function clearAllSelections() {
         try {
-            await chrome.storage.local.remove(window.location.href);
+            await StorageManager.clearElements(window.location.href);
             clickedElements.forEach(element => removeHighlight(element));
             clickedElements.clear();
         } catch (err) {

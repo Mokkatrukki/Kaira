@@ -3,6 +3,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('toggleSelect');
     let isActive = false;
 
+    // Storage management functions
+    const StorageManager = {
+        async clearElements(url) {
+            try {
+                await chrome.storage.local.remove(url);
+                console.log('Cleared elements for:', url);
+            } catch (err) {
+                console.error('Error clearing elements:', err);
+            }
+        }
+    };
+
     toggleBtn.addEventListener('click', async () => {
         isActive = !isActive;
         console.log('Toggle clicked, new state:', isActive);
@@ -32,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     clearBtn.addEventListener('click', async () => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         try {
+            // Clear storage for current tab
+            await StorageManager.clearElements(tab.url);
             await chrome.tabs.sendMessage(tab.id, {
                 action: 'clearSelection'
             });
