@@ -53,15 +53,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('selectedElements');
         const elementCard = document.createElement('div');
         elementCard.className = 'element-card';
+        
+        const content = element.content || 'No content';
+        const truncatedContent = content.length > 50 ? content.substring(0, 47) + '...' : content;
+        const url = element.url || 'N/A';
+        const urlHtml = url !== 'N/A' ? `<a href="${url}" target="_blank">${url}</a>` : 'N/A';
+        
         elementCard.innerHTML = `
-            <pre>Content: ${element.content}</pre>
-            <pre>Tag: ${element.tagName}</pre>
-            <pre>Url: ${element.url || 'N/A'}</pre>
-            <pre>Class: ${element.className || 'N/A'}</pre>
-            <pre>XPath: ${element.xpath}</pre>
-            <pre>CSS Selector: ${element.cssSelector}</pre>
-            
+            <div class="card-header">
+                <div class="url-line">${urlHtml}</div>
+                <div class="content-line">${truncatedContent}</div>
+            </div>
+            <div class="card-details hidden">
+                <pre>Tag: ${element.tagName}</pre>
+                <pre>Class: ${element.className || 'N/A'}</pre>
+                <pre>XPath: ${element.xpath}</pre>
+                <pre>CSS Selector: ${element.cssSelector}</pre>
+            </div>
+            <button class="show-more">Show more</button>
         `;
+
+        const showMoreBtn = elementCard.querySelector('.show-more');
+        const details = elementCard.querySelector('.card-details');
+        
+        showMoreBtn.addEventListener('click', () => {
+            details.classList.toggle('hidden');
+            showMoreBtn.textContent = details.classList.contains('hidden') ? 'Show more' : 'Show less';
+        });
+
         container.appendChild(elementCard);
     }
 });

@@ -60,15 +60,68 @@ button:hover {
 }
 
 .element-card {
-    background: #f5f5f5;
-    border: 1px solid #ddd;
+    background: #fff;
+    border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 8px;
+    margin: 8px 0;
 }
 
 .element-card pre {
     margin: 5px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.card-header {
+    margin-bottom: 8px;
+}
+
+.url-line {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+
+.url-line a {
+    color: #2196F3;
+    text-decoration: none;
+}
+
+.url-line a:hover {
+    text-decoration: underline;
+}
+
+.content-line {
+    font-weight: bold;
+}
+
+.card-details {
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+    margin-top: 8px;
+    font-size: 0.9em;
+}
+
+.card-details.hidden {
+    display: none;
+}
+
+.show-more {
+    background: none;
+    border: none;
+    color: #2196F3;
+    cursor: pointer;
+    padding: 4px 0;
+    font-size: 0.9em;
+}
+
+.show-more:hover {
+    text-decoration: underline;
+}
+
+.card-details pre {
+    margin: 4px 0;
     white-space: pre-wrap;
     word-break: break-all;
 }

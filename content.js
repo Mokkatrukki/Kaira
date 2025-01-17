@@ -7,7 +7,7 @@ if (window.hasRun === true) {
     console.log('Content script loaded');
 
     const RETRY_DELAY = 1000; // 1 second delay
-    const MAX_RETRIES = 3;    // Maximum number of retries
+    const MAX_RETRIES = 5;    // Maximum number of retries
 
     // Add sleep helper function
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
