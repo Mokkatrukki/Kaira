@@ -65,28 +65,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displaySelectedElement(element) {
         const container = document.getElementById('selectedElements');
+        
+        // Get or create origin section
+        const origin = new URL(element.url).origin;
+        let originSection = container.querySelector(`[data-origin="${origin}"]`);
+        if (!originSection) {
+            originSection = document.createElement('div');
+            originSection.className = 'origin-section';
+            originSection.dataset.origin = origin;
+            originSection.innerHTML = `
+                <h2 class="origin-header">${origin}</h2>
+                <div class="templates-container"></div>
+            `;
+            container.appendChild(originSection);
+        }
+
+        // Get or create template section for this URL
+        const templatesContainer = originSection.querySelector('.templates-container');
+        let templateSection = templatesContainer.querySelector(`[data-url="${element.url}"]`);
+        if (!templateSection) {
+            templateSection = document.createElement('div');
+            templateSection.className = 'template-section';
+            templateSection.dataset.url = element.url;
+            templateSection.innerHTML = `
+                <h3 class="template-header">Template: ${new URL(element.url).pathname}</h3>
+                <div class="elements-list"></div>
+            `;
+            templatesContainer.appendChild(templateSection);
+        }
+
+        // Create element card
+        const elementsList = templateSection.querySelector('.elements-list');
         const elementCard = document.createElement('div');
         elementCard.className = 'element-card';
         
         const content = element.content || 'No content';
         const truncatedContent = content.length > 50 ? content.substring(0, 47) + '...' : content;
-        const url = element.url || 'N/A';
-        const urlHtml = url !== 'N/A' ? `<a href="${url}" target="_blank">${url}</a>` : 'N/A';
         
         elementCard.innerHTML = `
             <div class="card-header">
-                <div class="url-line">${urlHtml}</div>
+                <div class="element-type">${element.type}</div>
                 <div class="content-line">${truncatedContent}</div>
             </div>
             <div class="card-details hidden">
-                <pre>Tag: ${element.tagName}</pre>
-                <pre>Class: ${element.className || 'N/A'}</pre>
                 <pre>XPath: ${element.xpath}</pre>
                 <pre>CSS Selector: ${element.cssSelector}</pre>
             </div>
             <button class="show-more">Show more</button>
         `;
 
+        // Add show/hide functionality
         const showMoreBtn = elementCard.querySelector('.show-more');
         const details = elementCard.querySelector('.card-details');
         
@@ -95,6 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
             showMoreBtn.textContent = details.classList.contains('hidden') ? 'Show more' : 'Show less';
         });
 
-        container.appendChild(elementCard);
+        elementsList.appendChild(elementCard);
     }
 });

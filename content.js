@@ -37,6 +37,7 @@ if (window.hasRun === true) {
 
     let selectionEnabled = false;
     let clickedElements = new Set();
+    let isPopupOpen = false;  // Add this flag
     console.log('Content script loaded');
 
     const RETRY_DELAY = 1000; // 1 second delay
@@ -150,7 +151,7 @@ if (window.hasRun === true) {
     }
 
     document.addEventListener('mouseover', function(event) {
-        if (selectionEnabled && event.target.tagName) {
+        if (selectionEnabled && !isPopupOpen && event.target.tagName) {  // Add popup check
             console.log('Mouseover element:', event.target);
             if (!clickedElements.has(event.target)) {
                 highlightElement(event.target, 'grey');
@@ -159,7 +160,7 @@ if (window.hasRun === true) {
     });
 
     document.addEventListener('mouseout', function(event) {
-        if (selectionEnabled && event.target.tagName) {
+        if (selectionEnabled && !isPopupOpen && event.target.tagName) {  // Add popup check
             console.log('Mouseout element:', event.target);
             if (!clickedElements.has(event.target)) {
                 removeHighlight(event.target);
@@ -168,19 +169,24 @@ if (window.hasRun === true) {
     });
 
     document.addEventListener('click', async function(event) {
-        if (selectionEnabled && event.target.tagName) {
+        if (selectionEnabled && !isPopupOpen && event.target.tagName) {  // Add popup check
             event.preventDefault();
             if (clickedElements.has(event.target)) {
                 clickedElements.delete(event.target);
                 removeHighlight(event.target);
                 await updateStorage();
             } else {
+                // Show element type selection popup
+                const type = await showTypeSelectionPopup(event);
+                if (!type) return; // User cancelled
+
                 clickedElements.add(event.target);
                 highlightElement(event.target, 'red', '3px');
                 const uniqueId = assignUniqueId(event.target);
                 const elementData = {
                     action: 'elementSelected',
                     element: {
+                        type: type, // 'title', 'price', or 'other'
                         tagName: event.target.tagName,
                         id: event.target.id,
                         className: event.target.className,
@@ -191,12 +197,108 @@ if (window.hasRun === true) {
                         url: window.location.href
                     }
                 };
-                await updateStorage();
+                
+                await StorageManager.saveElements(elementData.element);
                 console.log('Selected element data:', JSON.stringify(elementData, null, 2));
                 chrome.runtime.sendMessage(elementData);
             }
         }
     });
+
+    function showTypeSelectionPopup(event) {
+        return new Promise((resolve) => {
+            isPopupOpen = true;  // Set flag when opening popup
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                left: ${event.clientX}px;
+                top: ${event.clientY}px;
+                background: white;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 8px;
+                z-index: 10000;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                min-width: 120px;
+            `;
+
+            // Add close button
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = `
+                position: absolute;
+                right: 4px;
+                top: 4px;
+                background: none;
+                border: none;
+                font-size: 16px;
+                cursor: pointer;
+                padding: 0 4px;
+                color: #666;
+            `;
+            closeBtn.onclick = () => {
+                document.body.removeChild(popup);
+                document.removeEventListener('click', closeHandler);
+                document.removeEventListener('keydown', handleEsc);
+                isPopupOpen = false;  // Reset flag when closing
+                resolve(null);
+            };
+            popup.appendChild(closeBtn);
+
+            const options = ['title', 'price', 'other'];
+            options.forEach(type => {
+                const button = document.createElement('button');
+                button.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                button.style.cssText = `
+                    display: block;
+                    width: 100%;
+                    margin: 4px 0;
+                    padding: 4px 8px;
+                    border: none;
+                    background: #f0f0f0;
+                    cursor: pointer;
+                    border-radius: 3px;
+                `;
+                button.onmouseover = () => {
+                    button.style.background = '#e0e0e0';
+                };
+                button.onmouseout = () => {
+                    button.style.background = '#f0f0f0';
+                };
+                button.onclick = () => {
+                    document.body.removeChild(popup);
+                    isPopupOpen = false;  // Reset flag when selecting
+                    resolve(type);
+                };
+                popup.appendChild(button);
+            });
+
+            document.body.appendChild(popup);
+
+            // Handle ESC key
+            const handleEsc = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(popup);
+                    document.removeEventListener('keydown', handleEsc);
+                    isPopupOpen = false;  // Reset flag when closing
+                    resolve(null);
+                }
+            };
+            document.addEventListener('keydown', handleEsc);
+
+            // Close popup if clicking outside
+            const closeHandler = (e) => {
+                if (!popup.contains(e.target)) {
+                    document.body.removeChild(popup);
+                    document.removeEventListener('click', closeHandler);
+                    document.removeEventListener('keydown', handleEsc);
+                    isPopupOpen = false;  // Reset flag when closing
+                    resolve(null);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        });
+    }
 
     // Add new function to update storage
     async function updateStorage() {
