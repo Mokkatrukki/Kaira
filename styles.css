@@ -51,3 +51,24 @@ button:hover {
 .toggle-btn:hover {
     opacity: 0.9;
 }
+
+.elements-container {
+    margin-top: 20px;
+    padding: 10px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.element-card {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.element-card pre {
+    margin: 5px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}

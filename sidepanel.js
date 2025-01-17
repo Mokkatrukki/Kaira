@@ -27,4 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error:', err);
         }
     });
+
+    // Add message listener for selected elements
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.action === 'elementSelected') {
+            displaySelectedElement(message.element);
+        }
+    });
+
+    function displaySelectedElement(element) {
+        const container = document.getElementById('selectedElements');
+        const elementCard = document.createElement('div');
+        elementCard.className = 'element-card';
+        elementCard.innerHTML = `
+            <pre>Content: ${element.content}</pre>
+            <pre>Tag: ${element.tagName}</pre>
+            <pre>Url: ${element.url || 'N/A'}</pre>
+            <pre>Class: ${element.className || 'N/A'}</pre>
+            <pre>XPath: ${element.xpath}</pre>
+            <pre>CSS Selector: ${element.cssSelector}</pre>
+            
+        `;
+        container.appendChild(elementCard);
+    }
 });
