@@ -22,6 +22,53 @@ if (window.hasRun === true) {
         element.style.border = '';
     }
 
+    function getElementXPath(element) {
+        if (element && element.nodeType === 1) {
+            const idx = Array.from(element.parentNode.children)
+                .filter(child => child.tagName === element.tagName)
+                .indexOf(element) + 1;
+            const path = getElementXPath(element.parentNode);
+            return `${path}/${element.tagName.toLowerCase()}[${idx}]`;
+        }
+        return '';
+    }
+
+    function getElementCSSSelector(element) {
+        if (element.tagName.toLowerCase() === 'html') return 'html';
+        let path = [];
+        while (element.parentElement) {
+            let selector = element.tagName.toLowerCase();
+            if (element.id) {
+                selector += `#${element.id}`;
+                path.unshift(selector);
+                break;
+            } else {
+                let sibling = element;
+                let nth = 1;
+                while (sibling = sibling.previousElementSibling) {
+                    if (sibling.tagName.toLowerCase() === selector) nth++;
+                }
+                if (nth !== 1) selector += `:nth-of-type(${nth})`;
+            }
+            path.unshift(selector);
+            element = element.parentElement;
+        }
+        return path.join(' > ');
+    }
+
+    function getElementContent(element) {
+        return element.textContent?.trim() || element.value || '';
+    }
+
+    let uniqueIdCounter = 0;
+
+    function assignUniqueId(element) {
+        if (!element.dataset.uniqueId) {
+            element.dataset.uniqueId = `unique-id-${uniqueIdCounter++}`;
+        }
+        return element.dataset.uniqueId;
+    }
+
     document.addEventListener('mouseover', function(event) {
         if (selectionEnabled && event.target.tagName) {
             console.log('Mouseover element:', event.target);
@@ -48,14 +95,22 @@ if (window.hasRun === true) {
             } else {
                 clickedElements.add(event.target);
                 highlightElement(event.target, 'red', '3px');
-                chrome.runtime.sendMessage({
+                const uniqueId = assignUniqueId(event.target);
+                const elementData = {
                     action: 'elementSelected',
                     element: {
                         tagName: event.target.tagName,
                         id: event.target.id,
-                        className: event.target.className
+                        className: event.target.className,
+                        uniqueId: uniqueId,
+                        xpath: getElementXPath(event.target),
+                        cssSelector: getElementCSSSelector(event.target),
+                        content: getElementContent(event.target),
+                        url: window.location.href
                     }
-                });
+                };
+                console.log('Selected element data:', JSON.stringify(elementData, null, 2));
+                chrome.runtime.sendMessage(elementData);
             }
             event.preventDefault();
         }
