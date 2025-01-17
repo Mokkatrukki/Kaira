@@ -5,30 +5,52 @@ if (window.hasRun === true) {
 
     // Storage management functions
     const StorageManager = {
-        async saveElements(url, selectors) {
+        async saveElements(element) {
             try {
-                if (selectors.length > 0) {
-                    console.log('Saving selectors:', selectors);
-                    await chrome.storage.local.set({ [url]: selectors });
+                const origin = new URL(element.url).origin;
+                const currentData = await chrome.storage.local.get(origin) || {};
+                
+                if (!currentData[origin]) {
+                    currentData[origin] = { templates: {} };
                 }
+
+                if (!currentData[origin].templates[element.url]) {
+                    currentData[origin].templates[element.url] = [];
+                }
+
+                currentData[origin].templates[element.url].push({
+                    type: element.type,
+                    content: element.content,
+                    xpath: element.xpath,
+                    cssSelector: element.cssSelector,
+                    timestamp: new Date().toISOString()
+                });
+
+                await chrome.storage.local.set({ [origin]: currentData[origin] });
+                console.log('Saved element for origin:', origin);
             } catch (err) {
                 console.error('Error saving elements:', err);
             }
         },
 
-        async getElements(url) {
+        async getElementsByOrigin(origin) {
             try {
-                const data = await chrome.storage.local.get(url);
-                return data[url] || [];
+                const data = await chrome.storage.local.get(origin);
+                return data[origin] || { templates: {} };
             } catch (err) {
                 console.error('Error getting elements:', err);
-                return [];
+                return { templates: {} };
             }
         },
 
         async clearElements(url) {
             try {
-                await chrome.storage.local.remove(url);
+                const origin = new URL(url).origin;
+                const data = await this.getElementsByOrigin(origin);
+                if (data.templates[url]) {
+                    delete data.templates[url];
+                    await chrome.storage.local.set({ [origin]: data });
+                }
             } catch (err) {
                 console.error('Error clearing elements:', err);
             }
@@ -49,28 +71,26 @@ if (window.hasRun === true) {
     // Updated restore function with retry mechanism
     async function restoreClickedElements(retryCount = 0) {
         try {
-            const storedSelectors = await StorageManager.getElements(window.location.href);
+            const data = await StorageManager.getElementsByOrigin(window.location.origin);
+            const templates = data?.templates?.[window.location.href] || [];
             
             let foundElements = 0;
-            // Filter out empty or invalid selectors
-            storedSelectors
-                .filter(selector => selector && selector.trim())
-                .forEach(selector => {
-                    try {
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            clickedElements.add(element);
-                            highlightElement(element, 'red', '3px');
-                            foundElements++;
-                        }
-                    } catch (err) {
-                        console.warn('Invalid selector:', selector, err);
+            templates.forEach(template => {
+                try {
+                    const element = document.querySelector(template.cssSelector);
+                    if (element) {
+                        clickedElements.add(element);
+                        highlightElement(element, 'red', '3px');
+                        foundElements++;
                     }
-                });
+                } catch (err) {
+                    console.warn('Invalid selector:', template.cssSelector, err);
+                }
+            });
 
             // If we haven't found all elements and have retries left, try again
-            if (foundElements < storedSelectors.length && retryCount < MAX_RETRIES) {
-                console.log(`Found ${foundElements}/${storedSelectors.length} elements, retrying in ${RETRY_DELAY}ms... (${retryCount + 1}/${MAX_RETRIES})`);
+            if (foundElements < templates.length && retryCount < MAX_RETRIES) {
+                console.log(`Found ${foundElements}/${templates.length} elements, retrying in ${RETRY_DELAY}ms... (${retryCount + 1}/${MAX_RETRIES})`);
                 await sleep(RETRY_DELAY);
                 await restoreClickedElements(retryCount + 1);
             }
@@ -290,8 +310,10 @@ if (window.hasRun === true) {
                     button.style.background = '#f0f0f0';
                 };
                 button.onclick = () => {
-                    document.body.removeChild(popup);
-                    isPopupOpen = false;  // Reset flag when selecting
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
+                    isPopupOpen = false;
                     resolve(type);
                 };
                 popup.appendChild(button);
@@ -302,7 +324,9 @@ if (window.hasRun === true) {
             // Handle ESC key
             const handleEsc = (e) => {
                 if (e.key === 'Escape') {
-                    document.body.removeChild(popup);
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
                     document.removeEventListener('keydown', handleEsc);
                     isPopupOpen = false;  // Reset flag when closing
                     resolve(null);
@@ -313,7 +337,9 @@ if (window.hasRun === true) {
             // Close popup if clicking outside
             const closeHandler = (e) => {
                 if (!popup.contains(e.target)) {
-                    document.body.removeChild(popup);
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
                     document.removeEventListener('click', closeHandler);
                     document.removeEventListener('keydown', handleEsc);
                     isPopupOpen = false;  // Reset flag when closing
@@ -324,12 +350,19 @@ if (window.hasRun === true) {
         });
     }
 
-    // Add new function to update storage
+    // Update updateStorage function to use new storage format
     async function updateStorage() {
-        const selectors = Array.from(clickedElements)
-            .map(el => getElementCSSSelector(el))
-            .filter(selector => selector && selector.trim());
-        await StorageManager.saveElements(window.location.href, selectors);
+        const elements = Array.from(clickedElements).map(el => ({
+            type: el.dataset.elementType || 'other',
+            content: getElementContent(el),
+            xpath: getElementXPath(el),
+            cssSelector: getElementCSSSelector(el),
+            url: window.location.href
+        }));
+
+        for (const element of elements) {
+            await StorageManager.saveElements(element);
+        }
     }
 
     // Add new function to handle clearing
