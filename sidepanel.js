@@ -28,6 +28,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const clearBtn = document.getElementById('clearSelect');
+    clearBtn.addEventListener('click', async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        try {
+            await chrome.tabs.sendMessage(tab.id, {
+                action: 'clearSelection'
+            });
+            // Clear the displayed elements in sidepanel
+            document.getElementById('selectedElements').innerHTML = '';
+        } catch (err) {
+            console.error('Error:', err);
+        }
+    });
+
     // Add message listener for selected elements
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'elementSelected') {
