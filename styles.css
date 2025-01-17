@@ -125,3 +125,21 @@ button:hover {
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+.type-selector {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: white;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.type-selector:hover {
+    border-color: #666;
+}
+
+.type-selector:focus {
+    outline: none;
+    border-color: #2196F3;
+}

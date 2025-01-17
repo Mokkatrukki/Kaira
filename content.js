@@ -90,10 +90,34 @@ if (window.hasRun === true) {
             console.log('Selection enabled:', selectionEnabled);
         } else if (message.action === 'clearSelection') {
             clearAllSelections();
+        } else if (message.action === 'changeElementType') {
+            handleElementTypeChange(message.cssSelector, message.newType);
         }
         sendResponse({ success: true });
         return true;  // Required for async response
     });
+
+    async function handleElementTypeChange(cssSelector, newType) {
+        try {
+            const element = document.querySelector(cssSelector);
+            if (element) {
+                const uniqueId = element.dataset.uniqueId;
+                const data = await StorageManager.getElementsByOrigin(window.location.origin);
+                
+                // Update the type in storage
+                if (data.templates[window.location.href]) {
+                    data.templates[window.location.href].forEach(entry => {
+                        if (entry.cssSelector === cssSelector) {
+                            entry.type = newType;
+                        }
+                    });
+                    await chrome.storage.local.set({ [window.location.origin]: data });
+                }
+            }
+        } catch (err) {
+            console.error('Error changing element type:', err);
+        }
+    }
 
     function highlightElement(element, color, width = '2px') {
         element.style.border = `${width} solid ${color}`;

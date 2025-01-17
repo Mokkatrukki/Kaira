@@ -104,7 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         elementCard.innerHTML = `
             <div class="card-header">
-                <div class="element-type">${element.type}</div>
+                <div class="element-type">
+                    <select class="type-selector">
+                        <option value="title" ${element.type === 'title' ? 'selected' : ''}>Title</option>
+                        <option value="price" ${element.type === 'price' ? 'selected' : ''}>Price</option>
+                        <option value="other" ${element.type === 'other' ? 'selected' : ''}>Other</option>
+                    </select>
+                </div>
                 <div class="content-line">${truncatedContent}</div>
             </div>
             <div class="card-details hidden">
@@ -113,6 +119,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <button class="show-more">Show more</button>
         `;
+
+        // Add type change handler
+        const typeSelector = elementCard.querySelector('.type-selector');
+        typeSelector.addEventListener('change', async (e) => {
+            const newType = e.target.value;
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'changeElementType',
+                    cssSelector: element.cssSelector,
+                    newType: newType
+                });
+            } catch (err) {
+                console.error('Error changing element type:', err);
+            }
+        });
 
         // Add show/hide functionality
         const showMoreBtn = elementCard.querySelector('.show-more');
