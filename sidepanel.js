@@ -3,22 +3,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('toggleSelect');
     let isActive = false;
 
-    toggleBtn.addEventListener('click', () => {
+    toggleBtn.addEventListener('click', async () => {
         isActive = !isActive;
         console.log('Toggle clicked, new state:', isActive);
         toggleBtn.textContent = isActive ? 'Disable Selection' : 'Enable Selection';
         toggleBtn.classList.toggle('active', isActive);
 
-        // Send message to active tab
-        chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
-            try {
-                await chrome.tabs.sendMessage(tabs[0].id, {
-                    action: 'toggleSelection',
-                    enabled: isActive
-                });
-            } catch (err) {
-                console.error('Error:', err);
-            }
+        // Inject content script
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
         });
+
+        // Send message to active tab
+        try {
+            console.log('Sending message to tab:', tab.id);
+            await chrome.tabs.sendMessage(tab.id, {
+                action: 'toggleSelection',
+                enabled: isActive
+            });
+        } catch (err) {
+            console.error('Error:', err);
+        }
     });
 });
