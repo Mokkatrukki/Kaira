@@ -42,13 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clearBtn = document.getElementById('clearSelect');
     clearBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to clear ALL stored data? This action cannot be undone.')) {
+            return;
+        }
+
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         try {
-            // Clear storage for current tab
-            await StorageManager.clearElements(tab.url);
+            // Clear all storage
+            await chrome.storage.local.clear();
+            
+            // Notify content script
             await chrome.tabs.sendMessage(tab.id, {
                 action: 'clearSelection'
             });
+            
             // Clear the displayed elements in sidepanel
             document.getElementById('selectedElements').innerHTML = '';
         } catch (err) {
