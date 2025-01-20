@@ -56,6 +56,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const exportBtn = document.getElementById('exportJson');
+    const jsonModal = document.getElementById('jsonModal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const copyJsonBtn = document.getElementById('copyJson');
+
+    exportBtn.addEventListener('click', async () => {
+        try {
+            const data = await chrome.storage.local.get(null);
+            jsonOutput.value = JSON.stringify(data, null, 2);
+            jsonModal.classList.remove('hidden');
+        } catch (err) {
+            console.error('Error exporting JSON:', err);
+        }
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        jsonModal.classList.add('hidden');
+    });
+
+    copyJsonBtn.addEventListener('click', () => {
+        jsonOutput.select();
+        document.execCommand('copy');
+    });
+
     // Add message listener for selected elements
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'elementSelected') {
@@ -148,3 +173,5 @@ document.addEventListener('DOMContentLoaded', () => {
         elementsList.appendChild(elementCard);
     }
 });
+
+
