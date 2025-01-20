@@ -380,6 +380,10 @@
             clearAllSelections();
         } else if (message.action === 'changeElementType') {
             handleElementTypeChange(message.cssSelector, message.newType);
+        } else if (message.action === 'disableContentScript') {
+            window.hasRun = false;
+            ElementManager.selectionEnabled = false;
+            console.log('Content script disabled');
         }
         sendResponse({ success: true });
         return true;  // Required for async response

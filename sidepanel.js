@@ -25,7 +25,8 @@
         closeModalBtn: document.querySelector('.close-modal'),
         jsonOutput: document.getElementById('jsonOutput'),
         copyJsonBtn: document.getElementById('copyJson'),
-        selectedElementsContainer: document.getElementById('selectedElements')
+        selectedElementsContainer: document.getElementById('selectedElements'),
+        openControlPageBtn: document.getElementById('openControlPage')
     };
 
     /**
@@ -186,6 +187,11 @@
             UIElements.copyJsonBtn.addEventListener('click', () => {
                 UIElements.jsonOutput.select();
                 document.execCommand('copy');
+            });
+
+            // Open control page button
+            UIElements.openControlPageBtn.addEventListener('click', function() {
+                chrome.runtime.sendMessage({ action: 'openControlPage' });
             });
         },
 

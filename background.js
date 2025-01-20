@@ -13,22 +13,32 @@ chrome.action.onClicked.addListener(() => {
 let activeTabId = null;
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
-  if (activeTabId && activeTabId !== tabId) {
-    chrome.tabs.sendMessage(activeTabId, {
-      action: 'toggleSelection',
-      enabled: false
-    });
-  }
-  activeTabId = tabId;
+    if (activeTabId && activeTabId !== tabId) {
+        try {
+            chrome.tabs.sendMessage(activeTabId, {
+                action: 'toggleSelection',
+                enabled: false
+            });
+        } catch (err) {
+            console.log('Tab communication error (expected for extension pages):', err);
+        }
+    }
+    activeTabId = tabId;
 });
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    try {
-        await chrome.scripting.executeScript({
-            target: { tabId: activeInfo.tabId },
-            files: ['content.js']
-        });
-    } catch (err) {
-        console.error('Failed to inject content script:', err);
+// Handle opening extension pages
+function openExtensionPage(page) {
+    chrome.tabs.create({
+        url: chrome.runtime.getURL(page),
+        active: true
+    });
+}
+
+// Listen for messages from other parts of the extension
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'openControlPage') {
+        openExtensionPage('control.html');
+        sendResponse({ success: true });
     }
+    return true;
 });
