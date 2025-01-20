@@ -1,7 +1,30 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Sidepanel loaded');
     const toggleBtn = document.getElementById('toggleSelect');
     let isActive = false;
+
+    // Load stored elements when panel opens
+    async function loadStoredElements() {
+        try {
+            const data = await chrome.storage.local.get(null);
+            for (const origin in data) {
+                const templates = data[origin].templates || {};
+                for (const url in templates) {
+                    templates[url].forEach(element => {
+                        displaySelectedElement({
+                            ...element,
+                            url: url
+                        });
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('Error loading stored elements:', err);
+        }
+    }
+
+    // Load stored elements immediately
+    await loadStoredElements();
 
     // Storage management functions
     const StorageManager = {
