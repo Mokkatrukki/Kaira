@@ -59,10 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to start element selection
   function startElementSelection() {
+    console.log('startElementSelection called');
     // Send message to background script to start element selection
     chrome.runtime.sendMessage({ 
       action: 'startElementSelection'
     }, (response) => {
+      console.log('startElementSelection response:', response);
       if (response && response.success) {
         console.log('Element selection started');
       } else {
@@ -74,27 +76,35 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to stop element selection
   function stopElementSelection() {
+    console.log('stopElementSelection called');
     // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      console.log('Active tabs query result:', tabs);
       const tab = tabs[0];
       
       if (tab && tab.id) {
+        console.log('Sending deactivateSelectionMode message to tab:', tab.id);
         // Send message to content script to deactivate selection mode
         chrome.tabs.sendMessage(tab.id, { action: 'deactivateSelectionMode' }, (response) => {
+          console.log('deactivateSelectionMode response:', response);
           if (response && response.success) {
-            console.log('Element selection stopped');
+            console.log('Element selection stopped successfully');
           } else {
-            console.error('Failed to stop element selection');
+            console.error('Failed to stop element selection, response:', response);
           }
           
           setSelectionStatus(false, false);
         });
+      } else {
+        console.error('No active tab found or tab.id is undefined');
+        setSelectionStatus(false, false);
       }
     });
   }
   
   // Function to set selection status
   function setSelectionStatus(isActive: boolean, isScrollingMode: boolean) {
+    console.log('setSelectionStatus called with isActive:', isActive, 'isScrollingMode:', isScrollingMode);
     if (isActive) {
       selectionStatus.textContent = isScrollingMode 
         ? 'Scrolling mode active (scroll to navigate, click to select)' 
@@ -102,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
       selectionStatus.className = 'status active';
       startSelectionButton.disabled = true;
       stopSelectionButton.disabled = false;
+      console.log('Selection mode activated, stopSelectionButton enabled:', !stopSelectionButton.disabled);
       
       // Show DOM path container in scrolling mode
       if (isScrollingMode) {
@@ -112,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
       selectionStatus.className = 'status inactive';
       startSelectionButton.disabled = false;
       stopSelectionButton.disabled = true;
+      console.log('Selection mode deactivated, stopSelectionButton disabled:', stopSelectionButton.disabled);
       
       // Hide DOM path container when not in scrolling mode
       domPathContainer.classList.add('hidden');
@@ -120,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display element information
   function displayElementInfo(info: ElementInfo) {
+    console.log('displayElementInfo called with info:', info);
     // Store the element info for later use
     lastSelectedElementInfo = info;
     
@@ -150,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display DOM path
   function displayDOMPath(path: DOMPathElement[]) {
+    console.log('displayDOMPath called with path:', path);
     // Clear existing path
     domPathContainer.innerHTML = '<h2>DOM Path</h2>';
     
@@ -201,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to search for an element using CSS selector
   function searchWithCssSelector() {
+    console.log('searchWithCssSelector called');
     if (!lastSelectedElementInfo) {
       console.error('No element has been selected yet');
       return;
@@ -233,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to search for an element using XPath
   function searchWithXPath() {
+    console.log('searchWithXPath called');
     if (!lastSelectedElementInfo) {
       console.error('No element has been selected yet');
       return;
@@ -265,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display search result
   function displaySearchResult(result: { text: string, tagName: string } | null) {
+    console.log('displaySearchResult called with result:', result);
     searchResult.classList.remove('hidden');
     
     if (result) {
@@ -293,7 +310,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Add event listeners
   startSelectionButton.addEventListener('click', startElementSelection);
-  stopSelectionButton.addEventListener('click', stopElementSelection);
+  stopSelectionButton.addEventListener('click', () => {
+    console.log('Stop selection button clicked');
+    stopElementSelection();
+  });
   
   // Add event listeners for copy buttons
   copyCssButton.addEventListener('click', async () => {
@@ -334,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {
+    console.log('Received message in sidepanel:', message);
     if (message.action === 'elementSelected') {
       // Display the selected element information
       displayElementInfo(message.data);
@@ -342,10 +363,16 @@ document.addEventListener('DOMContentLoaded', () => {
       setSelectionStatus(false, false);
     } else if (message.action === 'selectionModeActive') {
       // Update the selection status
+      console.log('Selection mode active message received with data:', message.data);
       setSelectionStatus(message.data, false);
     } else if (message.action === 'scrollingModeActive') {
       // Update the scrolling mode status
-      setSelectionStatus(true, message.data);
+      console.log('Scrolling mode active message received with data:', message.data);
+      // If scrolling mode is active, selection mode must also be active
+      // If scrolling mode is inactive, don't change selection mode status
+      if (message.data) {
+        setSelectionStatus(true, message.data);
+      }
     } else if (message.action === 'elementPathUpdated') {
       // Update the DOM path visualization
       displayDOMPath(message.data.path);
