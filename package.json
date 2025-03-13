@@ -1,15 +1,24 @@
 {
   "name": "kaira",
   "version": "1.0.0",
-  "main": "background.js",
+  "description": "Chrome extension with TypeScript and side panel",
+  "main": "index.js",
   "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "watch": "webpack --watch --config webpack.config.js",
+    "dev": "webpack serve --config webpack.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["chrome", "extension", "typescript", "sidepanel"],
   "author": "",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "prettier": "^3.4.2"
+    "@types/chrome": "^0.0.309",
+    "copy-webpack-plugin": "^13.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.2",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.0"
   }
 }
