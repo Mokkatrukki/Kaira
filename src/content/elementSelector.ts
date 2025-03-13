@@ -111,6 +111,86 @@ function getElementInfo(element: Element): any {
   };
 }
 
+// Function to search for an element using a CSS selector
+function searchWithCssSelector(selector: string): Element | null {
+  try {
+    return document.querySelector(selector);
+  } catch (error) {
+    console.error('Invalid CSS selector:', error);
+    return null;
+  }
+}
+
+// Function to search for an element using XPath
+function searchWithXPath(xpath: string): Element | null {
+  try {
+    const result = document.evaluate(
+      xpath,
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    return result.singleNodeValue as Element;
+  } catch (error) {
+    console.error('Invalid XPath:', error);
+    return null;
+  }
+}
+
+// Function to highlight a found element
+function highlightFoundElement(element: Element): void {
+  if (!element) return;
+  
+  // Cast to HTMLElement to access style property
+  const htmlElement = element as HTMLElement;
+  
+  // Create a temporary highlight effect
+  const originalOutline = htmlElement.style.outline;
+  const originalBackgroundColor = htmlElement.style.backgroundColor;
+  const originalPosition = htmlElement.style.position;
+  const originalZIndex = htmlElement.style.zIndex;
+  
+  // Apply highlight styles
+  htmlElement.style.outline = '3px solid #4285f4';
+  htmlElement.style.backgroundColor = 'rgba(66, 133, 244, 0.2)';
+  htmlElement.style.position = 'relative';
+  htmlElement.style.zIndex = '9999';
+  
+  // Scroll the element into view
+  element.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center'
+  });
+  
+  // Add pulsing effect
+  let pulseCount = 0;
+  const maxPulses = 3;
+  const pulseInterval = setInterval(() => {
+    if (pulseCount >= maxPulses) {
+      clearInterval(pulseInterval);
+      
+      // Reset styles after pulsing
+      htmlElement.style.outline = originalOutline;
+      htmlElement.style.backgroundColor = originalBackgroundColor;
+      htmlElement.style.position = originalPosition;
+      htmlElement.style.zIndex = originalZIndex;
+      return;
+    }
+    
+    // Toggle highlight
+    if (pulseCount % 2 === 0) {
+      htmlElement.style.outline = '3px solid #34a853'; // Green
+      htmlElement.style.backgroundColor = 'rgba(52, 168, 83, 0.2)';
+    } else {
+      htmlElement.style.outline = '3px solid #4285f4'; // Blue
+      htmlElement.style.backgroundColor = 'rgba(66, 133, 244, 0.2)';
+    }
+    
+    pulseCount++;
+  }, 500);
+}
+
 // Function to create highlight overlay
 function createHighlightOverlay(): HTMLElement {
   const overlay = document.createElement('div');
@@ -235,6 +315,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'deactivateSelectionMode') {
     deactivateSelectionMode();
     sendResponse({ success: true });
+  } else if (message.action === 'searchWithSelector') {
+    let element: Element | null = null;
+    
+    // Search for the element using the specified selector type
+    if (message.selectorType === 'css') {
+      element = searchWithCssSelector(message.selector);
+    } else if (message.selectorType === 'xpath') {
+      element = searchWithXPath(message.selector);
+    }
+    
+    if (element) {
+      // Highlight the found element
+      highlightFoundElement(element);
+      
+      // Return the element information
+      sendResponse({
+        success: true,
+        data: {
+          text: element.textContent?.trim() || '',
+          tagName: element.tagName.toLowerCase()
+        }
+      });
+    } else {
+      sendResponse({
+        success: false,
+        error: 'Element not found'
+      });
+    }
   }
   
   // Return true to indicate that we will send a response asynchronously

@@ -14,6 +14,9 @@ interface ElementInfo {
   html: string;
 }
 
+// Store the last selected element info
+let lastSelectedElementInfo: ElementInfo | null = null;
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Side Panel DOM loaded');
   
@@ -36,6 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyCssButton = document.getElementById('copy-css') as HTMLButtonElement;
   const copyXpathButton = document.getElementById('copy-xpath') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copy-text') as HTMLButtonElement;
+  
+  // Search elements
+  const searchCssButton = document.getElementById('search-css') as HTMLButtonElement;
+  const searchXpathButton = document.getElementById('search-xpath') as HTMLButtonElement;
+  const searchResult = document.getElementById('search-result') as HTMLDivElement;
+  const foundElementText = document.getElementById('found-element-text') as HTMLDivElement;
+  const foundElementTag = document.getElementById('found-element-tag') as HTMLDivElement;
+  const searchStatus = document.getElementById('search-status') as HTMLDivElement;
   
   // Function to start element selection
   function startElementSelection() {
@@ -88,6 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display element information
   function displayElementInfo(info: ElementInfo) {
+    // Store the element info for later use
+    lastSelectedElementInfo = info;
+    
     // Show the element info section
     elementInfoSection.classList.remove('hidden');
     
@@ -108,6 +122,90 @@ document.addEventListener('DOMContentLoaded', () => {
     cssSelector.textContent = info.cssSelector;
     xpathSelector.textContent = info.xpath;
     elementHtml.textContent = info.html;
+    
+    // Hide search result
+    searchResult.classList.add('hidden');
+  }
+  
+  // Function to search for an element using CSS selector
+  function searchWithCssSelector() {
+    if (!lastSelectedElementInfo) {
+      console.error('No element has been selected yet');
+      return;
+    }
+    
+    const selector = lastSelectedElementInfo.cssSelector;
+    
+    // Get the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      
+      if (tab && tab.id) {
+        // Send message to content script to search for the element
+        chrome.tabs.sendMessage(tab.id, { 
+          action: 'searchWithSelector', 
+          selectorType: 'css',
+          selector: selector 
+        }, (response) => {
+          if (response && response.success) {
+            console.log('Element found:', response.data);
+            displaySearchResult(response.data);
+          } else {
+            console.error('Failed to find element:', response?.error || 'Element not found');
+            displaySearchResult(null);
+          }
+        });
+      }
+    });
+  }
+  
+  // Function to search for an element using XPath
+  function searchWithXPath() {
+    if (!lastSelectedElementInfo) {
+      console.error('No element has been selected yet');
+      return;
+    }
+    
+    const xpath = lastSelectedElementInfo.xpath;
+    
+    // Get the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      
+      if (tab && tab.id) {
+        // Send message to content script to search for the element
+        chrome.tabs.sendMessage(tab.id, { 
+          action: 'searchWithSelector', 
+          selectorType: 'xpath',
+          selector: xpath 
+        }, (response) => {
+          if (response && response.success) {
+            console.log('Element found:', response.data);
+            displaySearchResult(response.data);
+          } else {
+            console.error('Failed to find element:', response?.error || 'Element not found');
+            displaySearchResult(null);
+          }
+        });
+      }
+    });
+  }
+  
+  // Function to display search result
+  function displaySearchResult(result: { text: string, tagName: string } | null) {
+    searchResult.classList.remove('hidden');
+    
+    if (result) {
+      foundElementTag.textContent = result.tagName || '-';
+      foundElementText.textContent = result.text || '-';
+      searchStatus.textContent = 'Element found';
+      searchStatus.style.color = 'var(--success-color)';
+    } else {
+      foundElementTag.textContent = '-';
+      foundElementText.textContent = '-';
+      searchStatus.textContent = 'Element not found';
+      searchStatus.style.color = 'var(--error-color)';
+    }
   }
   
   // Function to copy text to clipboard
@@ -157,6 +255,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+  
+  // Add event listeners for search buttons
+  searchCssButton.addEventListener('click', searchWithCssSelector);
+  searchXpathButton.addEventListener('click', searchWithXPath);
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {

@@ -88,6 +88,38 @@
       line-height: 1.5;
       margin-right: 30px;
     }
+    .search-section {
+      margin-top: 24px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: var(--light-background);
+    }
+    .search-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .search-button {
+      padding: 8px 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .search-button:hover {
+      background-color: var(--primary-color-dark);
+    }
+    .search-result {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 4px;
+      background-color: #f1f3f4;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
     .hidden {
       display: none;
     }
@@ -140,6 +172,30 @@
     
     <h2>Element HTML</h2>
     <div id="element-html" class="element-content">-</div>
+    
+    <div class="search-section">
+      <h2>Search with Saved Selectors</h2>
+      <p>Use the saved selectors to find the same element on this or other pages.</p>
+      <div class="search-buttons">
+        <button id="search-css" class="search-button">Search with CSS</button>
+        <button id="search-xpath" class="search-button">Search with XPath</button>
+      </div>
+      <div id="search-result" class="search-result hidden">
+        <h3>Search Result</h3>
+        <div class="info-row">
+          <div class="info-label">Element:</div>
+          <div id="found-element-tag" class="info-value">-</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Content:</div>
+          <div id="found-element-text" class="info-value">-</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Status:</div>
+          <div id="search-status" class="info-value">-</div>
+        </div>
+      </div>
+    </div>
   </div>
   
   <script src="js/sidepanel.js"></script>
