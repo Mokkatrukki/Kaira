@@ -2,6 +2,7 @@
 
 // State variables
 let isSelectionActive = false;
+let isScrollingMode = false;
 let highlightedElement: Element | null = null;
 let highlightOverlay: HTMLElement | null = null;
 
@@ -226,9 +227,55 @@ function removeHighlightOverlay(): void {
   }
 }
 
+// Function to send element path to side panel for visualization
+function sendElementPathToSidePanel(): void {
+  if (!highlightedElement) return;
+  
+  // Build the DOM path from the current element up to the body
+  const path: Array<{
+    tagName: string;
+    id: string | null;
+    classes: string[];
+    index: number;
+  }> = [];
+  
+  let current: Element | null = highlightedElement;
+  while (current && current !== document.body) {
+    // Get the index among siblings with the same tag
+    const tagName = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+    let index = 0;
+    
+    if (parent) {
+      const siblings = Array.from(parent.children).filter(
+        sibling => sibling.tagName.toLowerCase() === tagName
+      );
+      index = siblings.indexOf(current) + 1;
+    }
+    
+    path.unshift({
+      tagName,
+      id: current.id || null,
+      classes: Array.from(current.classList),
+      index
+    });
+    
+    current = current.parentElement;
+  }
+  
+  // Send the path to the side panel
+  chrome.runtime.sendMessage({
+    action: 'elementPathUpdated',
+    data: {
+      path,
+      currentElementInfo: getElementInfo(highlightedElement)
+    }
+  });
+}
+
 // Function to handle mouseover events
 function handleMouseOver(event: MouseEvent): void {
-  if (!isSelectionActive) return;
+  if (!isSelectionActive || isScrollingMode) return;
   
   // Prevent default behavior
   event.preventDefault();
@@ -255,26 +302,95 @@ function handleClick(event: MouseEvent): void {
   // Get the target element
   const target = event.target as Element;
   
-  // Extract element information
-  const elementInfo = getElementInfo(target);
+  // If we're already in scrolling mode, check if the click is on the highlighted element
+  if (isScrollingMode) {
+    // Check if the click is within the highlighted element's area
+    if (highlightedElement) {
+      const rect = highlightedElement.getBoundingClientRect();
+      const isInHighlightedArea = (
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
+      );
+      
+      if (isInHighlightedArea) {
+        // Select the current highlighted element
+        const elementInfo = getElementInfo(highlightedElement);
+        
+        // Send the element information to the side panel
+        chrome.runtime.sendMessage({
+          action: 'elementSelected',
+          data: elementInfo
+        });
+        
+        // Deactivate selection mode
+        deactivateSelectionMode();
+        return;
+      } else {
+        // Exit scrolling mode and go back to hover mode
+        isScrollingMode = false;
+        
+        // Update the highlighted element to the clicked element
+        highlightedElement = target;
+        positionHighlightOverlay(target);
+        return;
+      }
+    }
+  }
   
-  // Send the element information to the side panel
+  // If we're not in scrolling mode, enter scrolling mode
+  isScrollingMode = true;
+  highlightedElement = target;
+  positionHighlightOverlay(target);
+  
+  // Send current element path to side panel for visualization
+  sendElementPathToSidePanel();
+  
+  // Update status in side panel
   chrome.runtime.sendMessage({
-    action: 'elementSelected',
-    data: elementInfo
+    action: 'scrollingModeActive',
+    data: true
   });
+}
+
+// Function to handle wheel events for DOM navigation
+function handleWheel(event: WheelEvent): void {
+  if (!isSelectionActive || !isScrollingMode || !highlightedElement) return;
   
-  // Deactivate selection mode
-  deactivateSelectionMode();
+  // Prevent default behavior
+  event.preventDefault();
+  event.stopPropagation();
+  
+  // Determine direction
+  if (event.deltaY > 0) {
+    // Scroll down - navigate to first child
+    if (highlightedElement.firstElementChild) {
+      highlightedElement = highlightedElement.firstElementChild;
+    }
+  } else if (event.deltaY < 0) {
+    // Scroll up - navigate to parent
+    if (highlightedElement.parentElement) {
+      highlightedElement = highlightedElement.parentElement;
+    }
+  }
+  
+  // Update highlight overlay
+  positionHighlightOverlay(highlightedElement);
+  
+  // Send current element path to side panel for visualization
+  sendElementPathToSidePanel();
 }
 
 // Function to activate selection mode
 function activateSelectionMode(): void {
   isSelectionActive = true;
+  isScrollingMode = false;
   
   // Add event listeners
   document.addEventListener('mouseover', handleMouseOver, true);
   document.addEventListener('click', handleClick, true);
+  document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
   
   // Change cursor to indicate selection mode
   document.body.style.cursor = 'crosshair';
@@ -289,10 +405,12 @@ function activateSelectionMode(): void {
 // Function to deactivate selection mode
 function deactivateSelectionMode(): void {
   isSelectionActive = false;
+  isScrollingMode = false;
   
   // Remove event listeners
   document.removeEventListener('mouseover', handleMouseOver, true);
   document.removeEventListener('click', handleClick, true);
+  document.removeEventListener('wheel', handleWheel, true);
   
   // Reset cursor
   document.body.style.cursor = '';
@@ -303,6 +421,12 @@ function deactivateSelectionMode(): void {
   // Send message to side panel that selection mode is inactive
   chrome.runtime.sendMessage({
     action: 'selectionModeActive',
+    data: false
+  });
+  
+  // Send message that scrolling mode is inactive
+  chrome.runtime.sendMessage({
+    action: 'scrollingModeActive',
     data: false
   });
 }

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Kaira",
+  "version": "1.0",
+  "description": "Kaira Chrome Extension",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "scripting"
+  ],
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/keyboardHandler.ts"]
+    }
+  ],
+  "background": {
+    "service_worker": "src/background/background.ts"
+  }
+} 

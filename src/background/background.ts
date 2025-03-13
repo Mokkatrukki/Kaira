@@ -77,7 +77,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         if (injected) {
           // Send a message to the content script to activate selection mode
-          chrome.tabs.sendMessage(tab.id, { action: 'activateSelectionMode' }, (response) => {
+          chrome.tabs.sendMessage(tab.id, { 
+            action: 'activateSelectionMode'
+          }, (response) => {
             sendResponse(response);
           });
         } else {
@@ -93,7 +95,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   // Handle messages from the content script
-  if (message.action === 'elementSelected' || message.action === 'selectionModeActive') {
+  if (message.action === 'elementSelected' || 
+      message.action === 'selectionModeActive' || 
+      message.action === 'scrollingModeActive' ||
+      message.action === 'elementPathUpdated') {
     // Forward the message to the side panel
     chrome.runtime.sendMessage(message);
   }

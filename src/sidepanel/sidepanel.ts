@@ -14,6 +14,14 @@ interface ElementInfo {
   html: string;
 }
 
+// Interface for DOM path element
+interface DOMPathElement {
+  tagName: string;
+  id: string | null;
+  classes: string[];
+  index: number;
+}
+
 // Store the last selected element info
 let lastSelectedElementInfo: ElementInfo | null = null;
 
@@ -25,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const stopSelectionButton = document.getElementById('stop-selection') as HTMLButtonElement;
   const selectionStatus = document.getElementById('selection-status') as HTMLDivElement;
   const elementInfoSection = document.getElementById('element-info') as HTMLDivElement;
+  const domPathContainer = document.getElementById('dom-path-container') as HTMLDivElement;
   
   // Element info elements
   const elementTag = document.getElementById('element-tag') as HTMLDivElement;
@@ -51,12 +60,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Function to start element selection
   function startElementSelection() {
     // Send message to background script to start element selection
-    chrome.runtime.sendMessage({ action: 'startElementSelection' }, (response) => {
+    chrome.runtime.sendMessage({ 
+      action: 'startElementSelection'
+    }, (response) => {
       if (response && response.success) {
         console.log('Element selection started');
       } else {
         console.error('Failed to start element selection:', response?.error || 'Unknown error');
-        setSelectionStatus(false);
+        setSelectionStatus(false, false);
       }
     });
   }
@@ -76,24 +87,34 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Failed to stop element selection');
           }
           
-          setSelectionStatus(false);
+          setSelectionStatus(false, false);
         });
       }
     });
   }
   
   // Function to set selection status
-  function setSelectionStatus(isActive: boolean) {
+  function setSelectionStatus(isActive: boolean, isScrollingMode: boolean) {
     if (isActive) {
-      selectionStatus.textContent = 'Selection mode active';
+      selectionStatus.textContent = isScrollingMode 
+        ? 'Scrolling mode active (scroll to navigate, click to select)' 
+        : 'Selection mode active (click an element to begin)';
       selectionStatus.className = 'status active';
       startSelectionButton.disabled = true;
       stopSelectionButton.disabled = false;
+      
+      // Show DOM path container in scrolling mode
+      if (isScrollingMode) {
+        domPathContainer.classList.remove('hidden');
+      }
     } else {
       selectionStatus.textContent = 'Selection mode inactive';
       selectionStatus.className = 'status inactive';
       startSelectionButton.disabled = false;
       stopSelectionButton.disabled = true;
+      
+      // Hide DOM path container when not in scrolling mode
+      domPathContainer.classList.add('hidden');
     }
   }
   
@@ -125,6 +146,57 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Hide search result
     searchResult.classList.add('hidden');
+  }
+  
+  // Function to display DOM path
+  function displayDOMPath(path: DOMPathElement[]) {
+    // Clear existing path
+    domPathContainer.innerHTML = '<h2>DOM Path</h2>';
+    
+    // Create path elements
+    const pathElement = document.createElement('div');
+    pathElement.className = 'dom-path';
+    
+    // Add each element in the path
+    path.forEach((element, index) => {
+      const elementNode = document.createElement('div');
+      elementNode.className = 'dom-path-element';
+      
+      // Create element tag with ID and classes
+      let elementText = element.tagName;
+      if (element.id) {
+        elementText += `#${element.id}`;
+      }
+      if (element.classes.length > 0) {
+        elementText += `.${element.classes.join('.')}`;
+      }
+      
+      elementNode.textContent = elementText;
+      
+      // Add a separator except for the last element
+      if (index < path.length - 1) {
+        const separator = document.createElement('span');
+        separator.className = 'dom-path-separator';
+        separator.textContent = ' > ';
+        elementNode.appendChild(separator);
+      }
+      
+      pathElement.appendChild(elementNode);
+    });
+    
+    // Add navigation instructions
+    const instructions = document.createElement('div');
+    instructions.className = 'navigation-help';
+    instructions.innerHTML = `
+      <div class="help-title">Navigation Controls:</div>
+      <div class="help-item">• Scroll up: Navigate to parent element</div>
+      <div class="help-item">• Scroll down: Navigate to first child element</div>
+      <div class="help-item">• Click on highlighted area: Select this element</div>
+      <div class="help-item">• Click outside highlighted area: Return to hover mode</div>
+    `;
+    
+    domPathContainer.appendChild(pathElement);
+    domPathContainer.appendChild(instructions);
   }
   
   // Function to search for an element using CSS selector
@@ -267,10 +339,19 @@ document.addEventListener('DOMContentLoaded', () => {
       displayElementInfo(message.data);
       
       // Set selection status to inactive
-      setSelectionStatus(false);
+      setSelectionStatus(false, false);
     } else if (message.action === 'selectionModeActive') {
       // Update the selection status
-      setSelectionStatus(message.data);
+      setSelectionStatus(message.data, false);
+    } else if (message.action === 'scrollingModeActive') {
+      // Update the scrolling mode status
+      setSelectionStatus(true, message.data);
+    } else if (message.action === 'elementPathUpdated') {
+      // Update the DOM path visualization
+      displayDOMPath(message.data.path);
+      
+      // Update the element info
+      displayElementInfo(message.data.currentElementInfo);
     }
   });
 }); 
