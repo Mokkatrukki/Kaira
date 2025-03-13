@@ -14,14 +14,6 @@ interface ElementInfo {
   html: string;
 }
 
-// Interface for DOM path element
-interface DOMPathElement {
-  tagName: string;
-  id: string | null;
-  classes: string[];
-  index: number;
-}
-
 // Store the last selected element info
 let lastSelectedElementInfo: ElementInfo | null = null;
 
@@ -33,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const stopSelectionButton = document.getElementById('stop-selection') as HTMLButtonElement;
   const selectionStatus = document.getElementById('selection-status') as HTMLDivElement;
   const elementInfoSection = document.getElementById('element-info') as HTMLDivElement;
-  const domPathContainer = document.getElementById('dom-path-container') as HTMLDivElement;
   
   // Element info elements
   const elementTag = document.getElementById('element-tag') as HTMLDivElement;
@@ -99,17 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
       selectionStatus.className = 'status active';
       startSelectionButton.disabled = true;
       stopSelectionButton.disabled = false;
-      
-      // Show DOM path container in scrolling mode
-      domPathContainer.classList.toggle('hidden', !isScrollingMode);
     } else {
       selectionStatus.textContent = 'Selection mode inactive';
       selectionStatus.className = 'status inactive';
       startSelectionButton.disabled = false;
       stopSelectionButton.disabled = true;
-      
-      // Hide DOM path container
-      domPathContainer.classList.add('hidden');
     }
   }
   
@@ -135,57 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Hide search result
     searchResult.classList.add('hidden');
-  }
-  
-  // Function to display DOM path
-  function displayDOMPath(path: DOMPathElement[]) {
-    // Clear existing path
-    domPathContainer.innerHTML = '<h2>DOM Path</h2>';
-    
-    // Create path elements
-    const pathElement = document.createElement('div');
-    pathElement.className = 'dom-path';
-    
-    // Add each element in the path
-    path.forEach((element, index) => {
-      const elementNode = document.createElement('div');
-      elementNode.className = 'dom-path-element';
-      
-      // Create element tag with ID and classes
-      let elementText = element.tagName;
-      if (element.id) {
-        elementText += `#${element.id}`;
-      }
-      if (element.classes.length > 0) {
-        elementText += `.${element.classes.join('.')}`;
-      }
-      
-      elementNode.textContent = elementText;
-      
-      // Add a separator except for the last element
-      if (index < path.length - 1) {
-        const separator = document.createElement('span');
-        separator.className = 'dom-path-separator';
-        separator.textContent = ' > ';
-        elementNode.appendChild(separator);
-      }
-      
-      pathElement.appendChild(elementNode);
-    });
-    
-    // Add navigation instructions
-    const instructions = document.createElement('div');
-    instructions.className = 'navigation-help';
-    instructions.innerHTML = `
-      <div class="help-title">Navigation Controls:</div>
-      <div class="help-item">• Scroll up: Navigate to parent element</div>
-      <div class="help-item">• Scroll down: Navigate to first child element</div>
-      <div class="help-item">• Click on highlighted area: Select this element</div>
-      <div class="help-item">• Click outside highlighted area: Return to hover mode</div>
-    `;
-    
-    domPathContainer.appendChild(pathElement);
-    domPathContainer.appendChild(instructions);
   }
   
   // Function to search for an element using a selector
@@ -283,11 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message.data) {
           setSelectionStatus(true, message.data);
         }
-        break;
-        
-      case 'elementPathUpdated':
-        displayDOMPath(message.data.path);
-        displayElementInfo(message.data.currentElementInfo);
         break;
     }
   });

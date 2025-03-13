@@ -128,45 +128,6 @@
       gap: 8px;
       flex-wrap: wrap;
     }
-    .dom-path {
-      margin-top: 8px;
-      padding: 8px;
-      background-color: #f1f3f4;
-      border-radius: 4px;
-      font-family: monospace;
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-    .dom-path-element {
-      display: inline-block;
-      padding: 2px 4px;
-      margin: 2px;
-      background-color: rgba(26, 115, 232, 0.1);
-      border-radius: 2px;
-      cursor: pointer;
-    }
-    .dom-path-element:hover {
-      background-color: rgba(26, 115, 232, 0.2);
-    }
-    .dom-path-separator {
-      color: #5f6368;
-      margin: 0 2px;
-    }
-    .navigation-help {
-      margin-top: 8px;
-      padding: 8px;
-      background-color: #e8f0fe;
-      border-radius: 4px;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .help-title {
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-    .help-item {
-      margin-bottom: 2px;
-    }
   </style>
 </head>
 <body>
@@ -178,11 +139,6 @@
       <button id="stop-selection" disabled>Cancel Selection</button>
     </div>
     <div id="selection-status" class="status inactive">Selection mode inactive</div>
-  </div>
-  
-  <div id="dom-path-container" class="hidden">
-    <h2>DOM Path</h2>
-    <!-- DOM path will be inserted here dynamically -->
   </div>
   
   <div id="element-info" class="hidden">

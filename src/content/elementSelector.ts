@@ -222,52 +222,6 @@ const overlay = {
   }
 };
 
-// Function to send element path to side panel for visualization
-function sendElementPathToSidePanel(): void {
-  if (!highlightedElement) return;
-  
-  // Build the DOM path from the current element up to the body
-  const path: Array<{
-    tagName: string;
-    id: string | null;
-    classes: string[];
-    index: number;
-  }> = [];
-  
-  let current: Element | null = highlightedElement;
-  while (current && current !== document.body) {
-    // Get the index among siblings with the same tag
-    const tagName = current.tagName.toLowerCase();
-    const parent = current.parentElement;
-    let index = 0;
-    
-    if (parent) {
-      const siblings = Array.from(parent.children).filter(
-        sibling => sibling.tagName.toLowerCase() === tagName
-      );
-      index = siblings.indexOf(current) + 1;
-    }
-    
-    path.unshift({
-      tagName,
-      id: current.id || null,
-      classes: Array.from(current.classList),
-      index
-    });
-    
-    current = current.parentElement;
-  }
-  
-  // Send the path to the side panel
-  chrome.runtime.sendMessage({
-    action: 'elementPathUpdated',
-    data: {
-      path,
-      currentElementInfo: getElementInfo(highlightedElement)
-    }
-  });
-}
-
 // Event handlers
 const handlers = {
   // Handle mouseover events
@@ -348,9 +302,6 @@ const handlers = {
     highlightedElement = target;
     overlay.position(target);
     
-    // Send current element path to side panel for visualization
-    sendElementPathToSidePanel();
-    
     // Update status in side panel
     chrome.runtime.sendMessage({
       action: 'scrollingModeActive',
@@ -381,9 +332,6 @@ const handlers = {
     
     // Update highlight overlay
     overlay.position(highlightedElement);
-    
-    // Send current element path to side panel for visualization
-    sendElementPathToSidePanel();
   }
 };
 
