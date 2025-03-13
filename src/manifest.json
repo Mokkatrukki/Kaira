@@ -3,7 +3,8 @@
   "name": "Kaira",
   "version": "1.0.0",
   "description": "Chrome extension with TypeScript and side panel",
-  "permissions": ["sidePanel", "storage"],
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "js/background.js",
     "type": "module"

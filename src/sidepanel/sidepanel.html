@@ -4,21 +4,128 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaira Side Panel</title>
+  <link rel="stylesheet" href="styles/common.css">
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 16px;
-      color: #333;
+    .status {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-weight: bold;
     }
-    h1 {
-      color: #1a73e8;
+    .status.active {
+      background-color: var(--success-background);
+      color: var(--success-color);
+    }
+    .status.inactive {
+      background-color: var(--light-background);
+      color: #5f6368;
+    }
+    .info-section {
+      margin-top: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 12px;
+      background-color: var(--light-background);
+    }
+    .info-row {
+      display: flex;
+      margin-bottom: 8px;
+    }
+    .info-label {
+      font-weight: bold;
+      width: 100px;
+      flex-shrink: 0;
+    }
+    .info-value {
+      word-break: break-all;
+    }
+    .selector-box {
+      margin-top: 8px;
+      position: relative;
+    }
+    .selector-value {
+      padding: 8px;
+      background-color: #f1f3f4;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-all;
+      margin-right: 30px;
+    }
+    .copy-button {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background-color: transparent;
+      color: var(--primary-color);
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      margin: 0;
+      font-size: 12px;
+    }
+    .element-content {
+      margin-top: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 12px;
+      background-color: var(--background-color);
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h1>Side Panel</h1>
-  <p>Hello World! This is the side panel template.</p>
+  <h1>Web Element Selector</h1>
+  
+  <div>
+    <button id="start-selection">Select Element</button>
+    <button id="stop-selection" disabled>Cancel Selection</button>
+    <div id="selection-status" class="status inactive">Selection mode inactive</div>
+  </div>
+  
+  <div id="element-info" class="hidden">
+    <h2>Selected Element</h2>
+    
+    <div class="info-section">
+      <div class="info-row">
+        <div class="info-label">Tag:</div>
+        <div id="element-tag" class="info-value">-</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">ID:</div>
+        <div id="element-id" class="info-value">-</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Classes:</div>
+        <div id="element-classes" class="info-value">-</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Text:</div>
+        <div id="element-text" class="info-value">-</div>
+      </div>
+    </div>
+    
+    <h2>CSS Selector</h2>
+    <div class="selector-box">
+      <div id="css-selector" class="selector-value">-</div>
+      <button id="copy-css" class="copy-button">Copy</button>
+    </div>
+    
+    <h2>XPath</h2>
+    <div class="selector-box">
+      <div id="xpath-selector" class="selector-value">-</div>
+      <button id="copy-xpath" class="copy-button">Copy</button>
+    </div>
+    
+    <h2>Element HTML</h2>
+    <div id="element-html" class="element-content">-</div>
+  </div>
   
   <script src="js/sidepanel.js"></script>
 </body>

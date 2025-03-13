@@ -4,31 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaira Popup</title>
+  <link rel="stylesheet" href="styles/common.css">
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       width: 300px;
-      padding: 16px;
-      color: #333;
-    }
-    h1 {
-      color: #1a73e8;
     }
     button {
-      background-color: #1a73e8;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      cursor: pointer;
-      margin-top: 10px;
+      width: 100%;
+    }
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
   </style>
 </head>
 <body>
-  <h1>Popup</h1>
-  <p>Hello World! This is the popup template.</p>
-  <button id="open-sidepanel">Open Side Panel</button>
+  <h1>Web Element Selector</h1>
+  <p>Select elements on the page and view their details in the side panel.</p>
+  
+  <div class="button-container">
+    <button id="start-selection">Select Element</button>
+    <button id="open-sidepanel">Open Side Panel</button>
+  </div>
   
   <script src="js/popup.js"></script>
 </body>
