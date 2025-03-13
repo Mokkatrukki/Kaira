@@ -1,7 +1,5 @@
 // Element Selector content script for Kaira Chrome extension
 
-console.log('Element Selector content script loaded');
-
 // State variables
 let isSelectionActive = false;
 let isScrollingMode = false;
@@ -21,9 +19,9 @@ function generateCssSelector(element: Element): string {
   
   // If element has a unique class, use that
   if (element.classList.length > 0) {
-    const uniqueClass = Array.from(element.classList).find(className => {
-      return document.querySelectorAll(`.${className}`).length === 1;
-    });
+    const uniqueClass = Array.from(element.classList).find(className => 
+      document.querySelectorAll(`.${className}`).length === 1
+    );
     
     if (uniqueClass) {
       return `.${uniqueClass}`;
@@ -99,7 +97,6 @@ function generateXPath(element: Element): string {
 
 // Function to get element information
 function getElementInfo(element: Element): any {
-  console.log('Getting element info for:', element.tagName);
   return {
     tagName: element.tagName.toLowerCase(),
     id: element.id || null,
@@ -115,38 +112,30 @@ function getElementInfo(element: Element): any {
   };
 }
 
-// Function to search for an element using a CSS selector
-function searchWithCssSelector(selector: string): Element | null {
-  console.log('Searching with CSS selector:', selector);
+// Function to search for an element using a selector
+function findElementWithSelector(selectorType: string, selector: string): Element | null {
   try {
-    return document.querySelector(selector);
-  } catch (error) {
-    console.error('Invalid CSS selector:', error);
+    if (selectorType === 'css') {
+      return document.querySelector(selector);
+    } else if (selectorType === 'xpath') {
+      const result = document.evaluate(
+        selector,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      return result.singleNodeValue as Element;
+    }
     return null;
-  }
-}
-
-// Function to search for an element using XPath
-function searchWithXPath(xpath: string): Element | null {
-  console.log('Searching with XPath:', xpath);
-  try {
-    const result = document.evaluate(
-      xpath,
-      document,
-      null,
-      XPathResult.FIRST_ORDERED_NODE_TYPE,
-      null
-    );
-    return result.singleNodeValue as Element;
   } catch (error) {
-    console.error('Invalid XPath:', error);
+    console.error(`Invalid ${selectorType} selector:`, error);
     return null;
   }
 }
 
 // Function to highlight a found element
 function highlightFoundElement(element: Element): void {
-  console.log('Highlighting found element:', element.tagName);
   if (!element) return;
   
   // Cast to HTMLElement to access style property
@@ -198,51 +187,44 @@ function highlightFoundElement(element: Element): void {
   }, 500);
 }
 
-// Function to create highlight overlay
-function createHighlightOverlay(): HTMLElement {
-  console.log('Creating highlight overlay');
-  const overlay = document.createElement('div');
-  overlay.style.position = 'absolute';
-  overlay.style.border = '2px solid #1a73e8';
-  overlay.style.backgroundColor = 'rgba(26, 115, 232, 0.1)';
-  overlay.style.pointerEvents = 'none';
-  overlay.style.zIndex = '10000';
-  overlay.style.boxShadow = '0 0 0 2000px rgba(0, 0, 0, 0.05)';
-  overlay.style.transition = 'all 0.2s ease-in-out';
-  document.body.appendChild(overlay);
-  return overlay;
-}
-
-// Function to position the highlight overlay
-function positionHighlightOverlay(element: Element): void {
-  console.log('Positioning highlight overlay for element:', element.tagName);
-  if (!highlightOverlay) {
-    highlightOverlay = createHighlightOverlay();
-  }
+// Function to manage the highlight overlay
+const overlay = {
+  create: (): HTMLElement => {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'absolute';
+    overlay.style.border = '2px solid #1a73e8';
+    overlay.style.backgroundColor = 'rgba(26, 115, 232, 0.1)';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '10000';
+    overlay.style.boxShadow = '0 0 0 2000px rgba(0, 0, 0, 0.05)';
+    overlay.style.transition = 'all 0.2s ease-in-out';
+    document.body.appendChild(overlay);
+    return overlay;
+  },
   
-  const rect = element.getBoundingClientRect();
-  highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
-  highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
-  highlightOverlay.style.width = `${rect.width}px`;
-  highlightOverlay.style.height = `${rect.height}px`;
-  highlightOverlay.style.display = 'block';
-}
-
-// Function to remove the highlight overlay
-function removeHighlightOverlay(): void {
-  console.log('Removing highlight overlay');
-  if (highlightOverlay) {
-    highlightOverlay.style.display = 'none';
+  position: (element: Element): void => {
+    if (!highlightOverlay) {
+      highlightOverlay = overlay.create();
+    }
+    
+    const rect = element.getBoundingClientRect();
+    highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
+    highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
+    highlightOverlay.style.width = `${rect.width}px`;
+    highlightOverlay.style.height = `${rect.height}px`;
+    highlightOverlay.style.display = 'block';
+  },
+  
+  remove: (): void => {
+    if (highlightOverlay) {
+      highlightOverlay.style.display = 'none';
+    }
   }
-}
+};
 
 // Function to send element path to side panel for visualization
 function sendElementPathToSidePanel(): void {
-  console.log('Sending element path to side panel');
-  if (!highlightedElement) {
-    console.log('No highlighted element to send path for');
-    return;
-  }
+  if (!highlightedElement) return;
   
   // Build the DOM path from the current element up to the body
   const path: Array<{
@@ -276,8 +258,6 @@ function sendElementPathToSidePanel(): void {
     current = current.parentElement;
   }
   
-  console.log('DOM path built:', path);
-  
   // Send the path to the side panel
   chrome.runtime.sendMessage({
     action: 'elementPathUpdated',
@@ -285,161 +265,137 @@ function sendElementPathToSidePanel(): void {
       path,
       currentElementInfo: getElementInfo(highlightedElement)
     }
-  }, (response) => {
-    console.log('elementPathUpdated message response:', response);
   });
 }
 
-// Function to handle mouseover events
-function handleMouseOver(event: MouseEvent): void {
-  if (!isSelectionActive || isScrollingMode) return;
+// Event handlers
+const handlers = {
+  // Handle mouseover events
+  mouseOver: (event: MouseEvent): void => {
+    if (!isSelectionActive || isScrollingMode) return;
+    
+    // Prevent default behavior
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Get the target element
+    const target = event.target as Element;
+    
+    // Update the highlighted element
+    highlightedElement = target;
+    
+    // Position the highlight overlay
+    overlay.position(target);
+  },
   
-  // Prevent default behavior
-  event.preventDefault();
-  event.stopPropagation();
-  
-  // Get the target element
-  const target = event.target as Element;
-  
-  // Update the highlighted element
-  highlightedElement = target;
-  
-  // Position the highlight overlay
-  positionHighlightOverlay(target);
-}
-
-// Function to handle click events
-function handleClick(event: MouseEvent): void {
-  console.log('Click event detected, isSelectionActive:', isSelectionActive, 'isScrollingMode:', isScrollingMode);
-  if (!isSelectionActive) return;
-  
-  // Prevent default behavior
-  event.preventDefault();
-  event.stopPropagation();
-  
-  // Get the target element
-  const target = event.target as Element;
-  console.log('Click target:', target.tagName);
-  
-  // If we're already in scrolling mode, check if the click is on the highlighted element
-  if (isScrollingMode) {
-    console.log('In scrolling mode, checking if click is on highlighted element');
-    // Check if the click is within the highlighted element's area
-    if (highlightedElement) {
-      const rect = highlightedElement.getBoundingClientRect();
-      const isInHighlightedArea = (
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom
-      );
-      
-      console.log('Is click in highlighted area:', isInHighlightedArea);
-      
-      if (isInHighlightedArea) {
-        // Select the current highlighted element
-        console.log('Selecting highlighted element');
-        const elementInfo = getElementInfo(highlightedElement);
+  // Handle click events
+  click: (event: MouseEvent): void => {
+    if (!isSelectionActive) return;
+    
+    // Prevent default behavior
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Get the target element
+    const target = event.target as Element;
+    
+    // If we're already in scrolling mode, check if the click is on the highlighted element
+    if (isScrollingMode) {
+      // Check if the click is within the highlighted element's area
+      if (highlightedElement) {
+        const rect = highlightedElement.getBoundingClientRect();
+        const isInHighlightedArea = (
+          event.clientX >= rect.left &&
+          event.clientX <= rect.right &&
+          event.clientY >= rect.top &&
+          event.clientY <= rect.bottom
+        );
         
-        // Send the element information to the side panel
-        chrome.runtime.sendMessage({
-          action: 'elementSelected',
-          data: elementInfo
-        }, (response) => {
-          console.log('elementSelected message response:', response);
-        });
-        
-        // Deactivate selection mode
-        deactivateSelectionMode();
-        return;
-      } else {
-        // Exit scrolling mode and go back to hover mode
-        console.log('Exiting scrolling mode, returning to hover mode');
-        isScrollingMode = false;
-        
-        // Update the highlighted element to the clicked element
-        highlightedElement = target;
-        positionHighlightOverlay(target);
-        
-        // Notify side panel that we're back to hover mode
-        chrome.runtime.sendMessage({
-          action: 'scrollingModeActive',
-          data: false
-        }, (response) => {
-          console.log('scrollingModeActive (false) message response:', response);
-        });
-        
-        return;
+        if (isInHighlightedArea) {
+          // Select the current highlighted element
+          const elementInfo = getElementInfo(highlightedElement);
+          
+          // Send the element information to the side panel
+          chrome.runtime.sendMessage({
+            action: 'elementSelected',
+            data: elementInfo
+          });
+          
+          // Deactivate selection mode
+          deactivateSelectionMode();
+          return;
+        } else {
+          // Exit scrolling mode and go back to hover mode
+          isScrollingMode = false;
+          
+          // Update the highlighted element to the clicked element
+          highlightedElement = target;
+          overlay.position(target);
+          
+          // Notify side panel that we're back to hover mode
+          chrome.runtime.sendMessage({
+            action: 'scrollingModeActive',
+            data: false
+          });
+          
+          return;
+        }
       }
     }
-  }
+    
+    // If we're not in scrolling mode, enter scrolling mode
+    isScrollingMode = true;
+    highlightedElement = target;
+    overlay.position(target);
+    
+    // Send current element path to side panel for visualization
+    sendElementPathToSidePanel();
+    
+    // Update status in side panel
+    chrome.runtime.sendMessage({
+      action: 'scrollingModeActive',
+      data: true
+    });
+  },
   
-  // If we're not in scrolling mode, enter scrolling mode
-  console.log('Entering scrolling mode');
-  isScrollingMode = true;
-  highlightedElement = target;
-  positionHighlightOverlay(target);
-  
-  // Send current element path to side panel for visualization
-  sendElementPathToSidePanel();
-  
-  // Update status in side panel
-  chrome.runtime.sendMessage({
-    action: 'scrollingModeActive',
-    data: true
-  }, (response) => {
-    console.log('scrollingModeActive (true) message response:', response);
-  });
-}
-
-// Function to handle wheel events for DOM navigation
-function handleWheel(event: WheelEvent): void {
-  if (!isSelectionActive || !isScrollingMode || !highlightedElement) return;
-  
-  // Prevent default behavior
-  event.preventDefault();
-  event.stopPropagation();
-  
-  console.log('Wheel event detected, deltaY:', event.deltaY);
-  
-  // Determine direction
-  if (event.deltaY > 0) {
-    // Scroll down - navigate to first child
-    console.log('Scrolling down - navigating to first child');
-    if (highlightedElement.firstElementChild) {
-      highlightedElement = highlightedElement.firstElementChild;
-      console.log('New highlighted element:', highlightedElement.tagName);
-    } else {
-      console.log('No first child element found');
+  // Handle wheel events for DOM navigation
+  wheel: (event: WheelEvent): void => {
+    if (!isSelectionActive || !isScrollingMode || !highlightedElement) return;
+    
+    // Prevent default behavior
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Determine direction
+    if (event.deltaY > 0) {
+      // Scroll down - navigate to first child
+      if (highlightedElement.firstElementChild) {
+        highlightedElement = highlightedElement.firstElementChild;
+      }
+    } else if (event.deltaY < 0) {
+      // Scroll up - navigate to parent
+      if (highlightedElement.parentElement) {
+        highlightedElement = highlightedElement.parentElement;
+      }
     }
-  } else if (event.deltaY < 0) {
-    // Scroll up - navigate to parent
-    console.log('Scrolling up - navigating to parent');
-    if (highlightedElement.parentElement) {
-      highlightedElement = highlightedElement.parentElement;
-      console.log('New highlighted element:', highlightedElement.tagName);
-    } else {
-      console.log('No parent element found');
-    }
+    
+    // Update highlight overlay
+    overlay.position(highlightedElement);
+    
+    // Send current element path to side panel for visualization
+    sendElementPathToSidePanel();
   }
-  
-  // Update highlight overlay
-  positionHighlightOverlay(highlightedElement);
-  
-  // Send current element path to side panel for visualization
-  sendElementPathToSidePanel();
-}
+};
 
 // Function to activate selection mode
 function activateSelectionMode(): void {
-  console.log('Activating selection mode');
   isSelectionActive = true;
   isScrollingMode = false;
   
   // Add event listeners
-  document.addEventListener('mouseover', handleMouseOver, true);
-  document.addEventListener('click', handleClick, true);
-  document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+  document.addEventListener('mouseover', handlers.mouseOver, true);
+  document.addEventListener('click', handlers.click, true);
+  document.addEventListener('wheel', handlers.wheel, { passive: false, capture: true });
   
   // Change cursor to indicate selection mode
   document.body.style.cursor = 'crosshair';
@@ -448,94 +404,77 @@ function activateSelectionMode(): void {
   chrome.runtime.sendMessage({
     action: 'selectionModeActive',
     data: true
-  }, (response) => {
-    console.log('selectionModeActive message response:', response);
   });
-  
-  console.log('Selection mode activated, isSelectionActive:', isSelectionActive);
 }
 
 // Function to deactivate selection mode
 function deactivateSelectionMode(): void {
-  console.log('Deactivating selection mode, current state - isSelectionActive:', isSelectionActive, 'isScrollingMode:', isScrollingMode);
   isSelectionActive = false;
   isScrollingMode = false;
   
   // Remove event listeners
-  document.removeEventListener('mouseover', handleMouseOver, true);
-  document.removeEventListener('click', handleClick, true);
-  document.removeEventListener('wheel', handleWheel, true);
+  document.removeEventListener('mouseover', handlers.mouseOver, true);
+  document.removeEventListener('click', handlers.click, true);
+  document.removeEventListener('wheel', handlers.wheel, true);
   
   // Reset cursor
   document.body.style.cursor = '';
   
   // Remove highlight overlay
-  removeHighlightOverlay();
+  overlay.remove();
   
   // Send message to side panel that selection mode is inactive
   chrome.runtime.sendMessage({
     action: 'selectionModeActive',
     data: false
-  }, (response) => {
-    console.log('selectionModeActive (false) message response:', response);
   });
   
   // Send message that scrolling mode is inactive
   chrome.runtime.sendMessage({
     action: 'scrollingModeActive',
     data: false
-  }, (response) => {
-    console.log('scrollingModeActive (false) message response:', response);
   });
-  
-  console.log('Selection mode deactivated, isSelectionActive:', isSelectionActive);
 }
 
 // Listen for messages from the extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Content script received message:', message);
-  
-  if (message.action === 'activateSelectionMode') {
-    console.log('Received activateSelectionMode message');
-    activateSelectionMode();
-    sendResponse({ success: true });
-  } else if (message.action === 'deactivateSelectionMode') {
-    console.log('Received deactivateSelectionMode message');
-    deactivateSelectionMode();
-    sendResponse({ success: true });
-  } else if (message.action === 'searchWithSelector') {
-    console.log('Received searchWithSelector message with selector type:', message.selectorType);
-    let element: Element | null = null;
-    
-    // Search for the element using the specified selector type
-    if (message.selectorType === 'css') {
-      element = searchWithCssSelector(message.selector);
-    } else if (message.selectorType === 'xpath') {
-      element = searchWithXPath(message.selector);
-    }
-    
-    if (element) {
-      // Highlight the found element
-      highlightFoundElement(element);
+  switch (message.action) {
+    case 'activateSelectionMode':
+      activateSelectionMode();
+      sendResponse({ success: true });
+      break;
       
-      // Return the element information
-      sendResponse({
-        success: true,
-        data: {
-          text: element.textContent?.trim() || '',
-          tagName: element.tagName.toLowerCase()
-        }
-      });
-    } else {
-      sendResponse({
-        success: false,
-        error: 'Element not found'
-      });
-    }
+    case 'deactivateSelectionMode':
+      deactivateSelectionMode();
+      sendResponse({ success: true });
+      break;
+      
+    case 'searchWithSelector':
+      const element = findElementWithSelector(message.selectorType, message.selector);
+      
+      if (element) {
+        // Highlight the found element
+        highlightFoundElement(element);
+        
+        // Return the element information
+        sendResponse({
+          success: true,
+          data: {
+            text: element.textContent?.trim() || '',
+            tagName: element.tagName.toLowerCase()
+          }
+        });
+      } else {
+        sendResponse({
+          success: false,
+          error: 'Element not found'
+        });
+      }
+      break;
   }
   
   // Return true to indicate that we will send a response asynchronously
   return true;
 });
 
-console.log('Element Selector content script loaded, initial state - isSelectionActive:', isSelectionActive, 'isScrollingMode:', isScrollingMode); 
+console.log('Element Selector content script loaded'); 
