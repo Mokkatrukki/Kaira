@@ -59,13 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to start element selection
   function startElementSelection() {
-    console.log('startElementSelection called');
-    // Send message to background script to start element selection
-    chrome.runtime.sendMessage({ 
-      action: 'startElementSelection'
-    }, (response) => {
-      console.log('startElementSelection response:', response);
-      if (response && response.success) {
+    chrome.runtime.sendMessage({ action: 'startElementSelection' }, (response) => {
+      if (response?.success) {
         console.log('Element selection started');
       } else {
         console.error('Failed to start element selection:', response?.error || 'Unknown error');
@@ -76,27 +71,20 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to stop element selection
   function stopElementSelection() {
-    console.log('stopElementSelection called');
-    // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      console.log('Active tabs query result:', tabs);
       const tab = tabs[0];
       
-      if (tab && tab.id) {
-        console.log('Sending deactivateSelectionMode message to tab:', tab.id);
-        // Send message to content script to deactivate selection mode
+      if (tab?.id) {
         chrome.tabs.sendMessage(tab.id, { action: 'deactivateSelectionMode' }, (response) => {
-          console.log('deactivateSelectionMode response:', response);
-          if (response && response.success) {
+          if (response?.success) {
             console.log('Element selection stopped successfully');
           } else {
-            console.error('Failed to stop element selection, response:', response);
+            console.error('Failed to stop element selection');
           }
-          
           setSelectionStatus(false, false);
         });
       } else {
-        console.error('No active tab found or tab.id is undefined');
+        console.error('No active tab found');
         setSelectionStatus(false, false);
       }
     });
@@ -104,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to set selection status
   function setSelectionStatus(isActive: boolean, isScrollingMode: boolean) {
-    console.log('setSelectionStatus called with isActive:', isActive, 'isScrollingMode:', isScrollingMode);
     if (isActive) {
       selectionStatus.textContent = isScrollingMode 
         ? 'Scrolling mode active (scroll to navigate, click to select)' 
@@ -112,27 +99,22 @@ document.addEventListener('DOMContentLoaded', () => {
       selectionStatus.className = 'status active';
       startSelectionButton.disabled = true;
       stopSelectionButton.disabled = false;
-      console.log('Selection mode activated, stopSelectionButton enabled:', !stopSelectionButton.disabled);
       
       // Show DOM path container in scrolling mode
-      if (isScrollingMode) {
-        domPathContainer.classList.remove('hidden');
-      }
+      domPathContainer.classList.toggle('hidden', !isScrollingMode);
     } else {
       selectionStatus.textContent = 'Selection mode inactive';
       selectionStatus.className = 'status inactive';
       startSelectionButton.disabled = false;
       stopSelectionButton.disabled = true;
-      console.log('Selection mode deactivated, stopSelectionButton disabled:', stopSelectionButton.disabled);
       
-      // Hide DOM path container when not in scrolling mode
+      // Hide DOM path container
       domPathContainer.classList.add('hidden');
     }
   }
   
   // Function to display element information
   function displayElementInfo(info: ElementInfo) {
-    console.log('displayElementInfo called with info:', info);
     // Store the element info for later use
     lastSelectedElementInfo = info;
     
@@ -145,13 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elementClasses.textContent = info.classes.length > 0 ? info.classes.join(' ') : '-';
     
     // Handle text content - clean it up and display it properly
-    if (info.text) {
-      // Trim whitespace but preserve line breaks
-      const cleanText = info.text.replace(/^\s+|\s+$/g, '');
-      elementText.textContent = cleanText || '-';
-    } else {
-      elementText.textContent = '-';
-    }
+    elementText.textContent = info.text ? info.text.replace(/^\s+|\s+$/g, '') || '-' : '-';
     
     cssSelector.textContent = info.cssSelector;
     xpathSelector.textContent = info.xpath;
@@ -163,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display DOM path
   function displayDOMPath(path: DOMPathElement[]) {
-    console.log('displayDOMPath called with path:', path);
     // Clear existing path
     domPathContainer.innerHTML = '<h2>DOM Path</h2>';
     
@@ -213,62 +188,27 @@ document.addEventListener('DOMContentLoaded', () => {
     domPathContainer.appendChild(instructions);
   }
   
-  // Function to search for an element using CSS selector
-  function searchWithCssSelector() {
-    console.log('searchWithCssSelector called');
+  // Function to search for an element using a selector
+  function searchWithSelector(selectorType: 'css' | 'xpath') {
     if (!lastSelectedElementInfo) {
       console.error('No element has been selected yet');
       return;
     }
     
-    const selector = lastSelectedElementInfo.cssSelector;
+    const selector = selectorType === 'css' 
+      ? lastSelectedElementInfo.cssSelector 
+      : lastSelectedElementInfo.xpath;
     
-    // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
       
-      if (tab && tab.id) {
-        // Send message to content script to search for the element
+      if (tab?.id) {
         chrome.tabs.sendMessage(tab.id, { 
           action: 'searchWithSelector', 
-          selectorType: 'css',
-          selector: selector 
+          selectorType,
+          selector 
         }, (response) => {
-          if (response && response.success) {
-            console.log('Element found:', response.data);
-            displaySearchResult(response.data);
-          } else {
-            console.error('Failed to find element:', response?.error || 'Element not found');
-            displaySearchResult(null);
-          }
-        });
-      }
-    });
-  }
-  
-  // Function to search for an element using XPath
-  function searchWithXPath() {
-    console.log('searchWithXPath called');
-    if (!lastSelectedElementInfo) {
-      console.error('No element has been selected yet');
-      return;
-    }
-    
-    const xpath = lastSelectedElementInfo.xpath;
-    
-    // Get the active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      
-      if (tab && tab.id) {
-        // Send message to content script to search for the element
-        chrome.tabs.sendMessage(tab.id, { 
-          action: 'searchWithSelector', 
-          selectorType: 'xpath',
-          selector: xpath 
-        }, (response) => {
-          if (response && response.success) {
-            console.log('Element found:', response.data);
+          if (response?.success) {
             displaySearchResult(response.data);
           } else {
             console.error('Failed to find element:', response?.error || 'Element not found');
@@ -281,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display search result
   function displaySearchResult(result: { text: string, tagName: string } | null) {
-    console.log('displaySearchResult called with result:', result);
     searchResult.classList.remove('hidden');
     
     if (result) {
@@ -298,87 +237,58 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // Function to copy text to clipboard
-  async function copyToClipboard(text: string): Promise<boolean> {
+  async function copyToClipboard(text: string, button: HTMLButtonElement): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
-      return true;
+      const originalText = button.textContent;
+      button.textContent = 'Copied!';
+      setTimeout(() => {
+        button.textContent = originalText;
+      }, 2000);
     } catch (error) {
       console.error('Failed to copy text to clipboard:', error);
-      return false;
     }
   }
   
   // Add event listeners
   startSelectionButton.addEventListener('click', startElementSelection);
-  stopSelectionButton.addEventListener('click', () => {
-    console.log('Stop selection button clicked');
-    stopElementSelection();
-  });
+  stopSelectionButton.addEventListener('click', stopElementSelection);
   
   // Add event listeners for copy buttons
-  copyCssButton.addEventListener('click', async () => {
-    const success = await copyToClipboard(cssSelector.textContent || '');
-    if (success) {
-      copyCssButton.textContent = 'Copied!';
-      setTimeout(() => {
-        copyCssButton.textContent = 'Copy';
-      }, 2000);
-    }
-  });
-  
-  copyXpathButton.addEventListener('click', async () => {
-    const success = await copyToClipboard(xpathSelector.textContent || '');
-    if (success) {
-      copyXpathButton.textContent = 'Copied!';
-      setTimeout(() => {
-        copyXpathButton.textContent = 'Copy';
-      }, 2000);
-    }
-  });
-  
+  copyCssButton.addEventListener('click', () => copyToClipboard(cssSelector.textContent || '', copyCssButton));
+  copyXpathButton.addEventListener('click', () => copyToClipboard(xpathSelector.textContent || '', copyXpathButton));
   if (copyTextButton) {
-    copyTextButton.addEventListener('click', async () => {
-      const success = await copyToClipboard(elementText.textContent || '');
-      if (success) {
-        copyTextButton.textContent = 'Copied!';
-        setTimeout(() => {
-          copyTextButton.textContent = 'Copy';
-        }, 2000);
-      }
-    });
+    copyTextButton.addEventListener('click', () => copyToClipboard(elementText.textContent || '', copyTextButton));
   }
   
   // Add event listeners for search buttons
-  searchCssButton.addEventListener('click', searchWithCssSelector);
-  searchXpathButton.addEventListener('click', searchWithXPath);
+  searchCssButton.addEventListener('click', () => searchWithSelector('css'));
+  searchXpathButton.addEventListener('click', () => searchWithSelector('xpath'));
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {
-    console.log('Received message in sidepanel:', message);
-    if (message.action === 'elementSelected') {
-      // Display the selected element information
-      displayElementInfo(message.data);
-      
-      // Set selection status to inactive
-      setSelectionStatus(false, false);
-    } else if (message.action === 'selectionModeActive') {
-      // Update the selection status
-      console.log('Selection mode active message received with data:', message.data);
-      setSelectionStatus(message.data, false);
-    } else if (message.action === 'scrollingModeActive') {
-      // Update the scrolling mode status
-      console.log('Scrolling mode active message received with data:', message.data);
-      // If scrolling mode is active, selection mode must also be active
-      // If scrolling mode is inactive, don't change selection mode status
-      if (message.data) {
-        setSelectionStatus(true, message.data);
-      }
-    } else if (message.action === 'elementPathUpdated') {
-      // Update the DOM path visualization
-      displayDOMPath(message.data.path);
-      
-      // Update the element info
-      displayElementInfo(message.data.currentElementInfo);
+    switch (message.action) {
+      case 'elementSelected':
+        displayElementInfo(message.data);
+        setSelectionStatus(false, false);
+        break;
+        
+      case 'selectionModeActive':
+        setSelectionStatus(message.data, false);
+        break;
+        
+      case 'scrollingModeActive':
+        // Only update if scrolling mode is being activated
+        // Ignore deactivation messages to prevent UI state conflicts
+        if (message.data) {
+          setSelectionStatus(true, message.data);
+        }
+        break;
+        
+      case 'elementPathUpdated':
+        displayDOMPath(message.data.path);
+        displayElementInfo(message.data.currentElementInfo);
+        break;
     }
   });
 }); 
