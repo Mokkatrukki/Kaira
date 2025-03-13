@@ -75,6 +75,19 @@
       white-space: pre-wrap;
       word-break: break-all;
     }
+    .text-content {
+      margin-top: 0;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 8px;
+      background-color: #f1f3f4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+      margin-right: 30px;
+    }
     .hidden {
       display: none;
     }
@@ -105,10 +118,12 @@
         <div class="info-label">Classes:</div>
         <div id="element-classes" class="info-value">-</div>
       </div>
-      <div class="info-row">
-        <div class="info-label">Text:</div>
-        <div id="element-text" class="info-value">-</div>
-      </div>
+    </div>
+    
+    <h2>Element Text Content</h2>
+    <div class="selector-box">
+      <div id="element-text" class="text-content">-</div>
+      <button id="copy-text" class="copy-button">Copy</button>
     </div>
     
     <h2>CSS Selector</h2>

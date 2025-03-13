@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Copy buttons
   const copyCssButton = document.getElementById('copy-css') as HTMLButtonElement;
   const copyXpathButton = document.getElementById('copy-xpath') as HTMLButtonElement;
+  const copyTextButton = document.getElementById('copy-text') as HTMLButtonElement;
   
   // Function to start element selection
   function startElementSelection() {
@@ -94,7 +95,16 @@ document.addEventListener('DOMContentLoaded', () => {
     elementTag.textContent = info.tagName;
     elementId.textContent = info.id || '-';
     elementClasses.textContent = info.classes.length > 0 ? info.classes.join(' ') : '-';
-    elementText.textContent = info.text || '-';
+    
+    // Handle text content - clean it up and display it properly
+    if (info.text) {
+      // Trim whitespace but preserve line breaks
+      const cleanText = info.text.replace(/^\s+|\s+$/g, '');
+      elementText.textContent = cleanText || '-';
+    } else {
+      elementText.textContent = '-';
+    }
+    
     cssSelector.textContent = info.cssSelector;
     xpathSelector.textContent = info.xpath;
     elementHtml.textContent = info.html;
@@ -135,6 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 2000);
     }
   });
+  
+  if (copyTextButton) {
+    copyTextButton.addEventListener('click', async () => {
+      const success = await copyToClipboard(elementText.textContent || '');
+      if (success) {
+        copyTextButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyTextButton.textContent = 'Copy';
+        }, 2000);
+      }
+    });
+  }
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {

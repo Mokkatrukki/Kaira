@@ -94,13 +94,13 @@ function generateXPath(element: Element): string {
   }
 }
 
-// Function to extract element information
-function extractElementInfo(element: Element): any {
+// Function to get element information
+function getElementInfo(element: Element): any {
   return {
     tagName: element.tagName.toLowerCase(),
     id: element.id || null,
     classes: Array.from(element.classList),
-    text: element.textContent?.trim().substring(0, 100) || null,
+    text: element.textContent || null,
     attributes: Array.from(element.attributes).map(attr => ({
       name: attr.name,
       value: attr.value
@@ -176,7 +176,7 @@ function handleClick(event: MouseEvent): void {
   const target = event.target as Element;
   
   // Extract element information
-  const elementInfo = extractElementInfo(target);
+  const elementInfo = getElementInfo(target);
   
   // Send the element information to the side panel
   chrome.runtime.sendMessage({
