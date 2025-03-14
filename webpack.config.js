@@ -6,7 +6,7 @@ module.exports = {
   devtool: 'source-map',
   entry: {
     background: './src/background/background.ts',
-    sidepanel: './src/sidepanel/sidepanel.ts',
+    sidepanel: './src/sidepanel/index.tsx',
     popup: './src/popup/popup.ts',
     elementSelector: './src/content/elementSelector.ts'
   },
@@ -17,14 +17,18 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.ts$/,
+        test: /\.(ts|tsx)$/,
         use: 'ts-loader',
         exclude: /node_modules/
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
       }
     ]
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.tsx', '.js', '.jsx']
   },
   plugins: [
     new CopyPlugin({

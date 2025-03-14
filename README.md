@@ -1,4 +1,148 @@
-# Kaira - Web Element Selector Chrome Extension
+# Kaira Chrome Extension
+
+A Chrome extension for building JSON objects by selecting elements from web pages.
+
+## Architecture Overview
+
+Kaira is built as a Chrome extension with a React-based UI and Zustand for state management. The extension allows users to create JSON objects by selecting elements from web pages and extracting their text content.
+
+## Project Structure
+
+```
+src/
+├── background/          # Background script for the extension
+│   └── background.ts    # Handles extension lifecycle and messaging
+├── content/             # Content scripts injected into web pages
+│   └── elementSelector.ts # Handles element selection in web pages
+├── popup/               # Extension popup UI
+│   └── popup.html       # Popup HTML
+│   └── popup.ts         # Popup script
+├── sidepanel/          # Side panel UI (main feature)
+│   ├── components/     # React components
+│   │   ├── JsonBuilder.tsx    # Main JSON builder component
+│   │   ├── KeyValueItem.tsx   # Component for key-value pairs
+│   │   └── LivePreview.tsx    # Component for live preview of selected elements
+│   ├── App.tsx         # Main React app component
+│   ├── elementSelection.ts # Utility for element selection
+│   ├── index.tsx       # React entry point
+│   ├── sidepanel.html  # HTML container for React app
+│   ├── store.ts        # Zustand store for state management
+│   └── styles.css      # Styles for the side panel
+└── manifest.json       # Extension manifest
+```
+
+## State Management with Zustand
+
+The application uses Zustand for state management, which provides a simple and lightweight approach to managing state in React applications.
+
+### Store Structure
+
+The application has two main stores:
+
+1. **JSON Builder Store** (`useJsonBuilderStore`):
+   - Manages the state of the JSON builder
+   - Handles key-value pairs and their operations
+   - Manages selection state for element picking
+
+2. **UI Store** (`useStore`):
+   - Manages UI-related state
+   - Handles live preview information
+
+### Key State Elements
+
+```typescript
+// JSON Builder Store
+interface JsonBuilderStore {
+  // Data
+  data: Record<string, string>;  // The actual JSON data
+  items: KeyValueItem[];         // UI items for key-value pairs
+  
+  // Selection state
+  isSelectionActive: boolean;    // Whether selection mode is active
+  isScrollingMode: boolean;      // Whether scrolling mode is active
+  currentItemId: string | null;  // ID of the item being edited
+  
+  // Counter for generating unique IDs
+  counter: number;
+  
+  // Actions (functions to modify state)
+  addItem: () => string;
+  removeItem: (id: string) => void;
+  updateItemKey: (id: string, key: string) => void;
+  startSelection: (itemId: string) => boolean;
+  setScrollingMode: (isActive: boolean) => void;
+  addSelectedValue: (value: string) => void;
+  resetSelection: () => void;
+  clear: () => void;
+}
+
+// UI Store
+interface State {
+  livePreviewInfo: LivePreviewInfo | null;  // Info about highlighted element
+  showLivePreview: boolean;                 // Whether to show live preview
+  setLivePreviewInfo: (info: LivePreviewInfo | null) => void;
+  setShowLivePreview: (show: boolean) => void;
+}
+```
+
+## Component Architecture
+
+### React Component Hierarchy
+
+```
+App
+└── JsonBuilder
+    ├── KeyValueItem (multiple)
+    └── LivePreview
+```
+
+### Component Responsibilities
+
+- **App**: Main container component that initializes the application
+- **JsonBuilder**: Manages the list of key-value pairs and JSON output
+- **KeyValueItem**: Handles individual key-value pairs with selection functionality
+- **LivePreview**: Displays information about the currently highlighted element
+
+## Element Selection Flow
+
+1. User clicks "Select" on a key-value pair
+2. `KeyValueItem` component calls `startSelection` from the store
+3. `startElementSelection` utility sends a message to the background script
+4. Background script activates the element selector in the content script
+5. Content script highlights elements as the user hovers over them
+6. Content script sends messages about highlighted elements
+7. `setupElementSelectionListeners` receives these messages and updates the UI
+8. When user clicks an element, its text is added to the selected key-value pair
+9. Selection mode is deactivated and the JSON is updated
+
+## Communication Flow
+
+```
+React UI <-> Zustand Store <-> Chrome Messaging API <-> Content Script <-> Web Page
+```
+
+1. **React UI to Zustand Store**: Components read from and update the Zustand store
+2. **Zustand Store to Chrome Messaging**: Element selection utilities use the store and send messages via Chrome API
+3. **Chrome Messaging to Content Script**: Background script relays messages to the content script
+4. **Content Script to Web Page**: Content script interacts with the web page DOM
+
+## Building and Deployment
+
+The project uses webpack for bundling:
+
+- TypeScript files are compiled to JavaScript
+- React components are bundled together
+- CSS is processed and included
+- Output files are placed in the `dist` directory
+- The extension can be loaded into Chrome from the `dist` directory
+
+## Key Technologies
+
+- **React**: UI library for building the interface
+- **Zustand**: State management library
+- **TypeScript**: Type-safe JavaScript
+- **Chrome Extension API**: For browser integration
+- **Webpack**: For bundling the application
 
 ## Overview
 
