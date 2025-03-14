@@ -1,45 +1,15 @@
 // Side panel script for Kaira Chrome extension
 
+import { 
+  jsonBuilderState, 
+  ElementInfo, 
+  LivePreviewInfo 
+} from './jsonBuilderState';
+
 console.log('Side Panel script loaded');
-
-// Interface for element information
-interface ElementInfo {
-  text: string | null;
-  xpath: string;
-  // We keep these properties in the interface for compatibility with the data sent from elementSelector.ts
-  // but we don't use them in the UI anymore
-  tagName: string;
-  id: string | null;
-  classes: string[];
-  attributes: { name: string; value: string }[];
-  cssSelector: string;
-  html: string;
-}
-
-// Interface for live preview information
-interface LivePreviewInfo {
-  tagName: string;
-  text: string | null;
-}
 
 // Store the last selected element info
 let lastSelectedElementInfo: ElementInfo | null = null;
-
-// JSON builder data structure
-interface JsonData {
-  [key: string]: string;
-}
-
-// Store the JSON data
-let jsonData: JsonData = {};
-// Store the current key being defined
-let currentJsonKey: string = '';
-// Flag to track if we're in JSON selection mode
-let isJsonSelectionMode: boolean = false;
-// Counter for generating unique IDs for key-value items
-let keyValueCounter: number = 0;
-// Store the ID of the key-value item currently being edited
-let currentKeyValueItemId: string | null = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Side Panel DOM loaded');
@@ -80,72 +50,103 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyJsonButton = document.getElementById('copy-json') as HTMLButtonElement;
   const clearJsonButton = document.getElementById('clear-json') as HTMLButtonElement;
   
-  // Function to create a new key-value item
-  function createKeyValueItem(): string {
-    const itemId = `key-value-${keyValueCounter++}`;
-    const itemHtml = `
-      <div id="${itemId}" class="key-value-item">
-        <input type="text" class="json-input key-input" placeholder="Enter key name...">
-        <div class="value-display">Click "Select" to choose a value</div>
-        <div class="key-value-actions">
-          <button class="action-button select-value">Select</button>
-          <button class="action-button remove">Remove</button>
+  // Flag to track if we're in JSON selection mode
+  let isJsonSelectionMode: boolean = false;
+  
+  // Function to render the key-value list
+  function renderKeyValueList(): void {
+    const items = jsonBuilderState.items;
+    
+    // Clear the list
+    keyValueList.innerHTML = '';
+    
+    // Add each item
+    items.forEach(item => {
+      const itemHtml = `
+        <div id="${item.id}" class="key-value-item">
+          <input type="text" class="json-input key-input" placeholder="Enter key name..." value="${item.key}">
+          <div class="value-display">${item.value || 'Click "Select" to choose a value'}</div>
+          <div class="key-value-actions">
+            <button class="action-button select-value">Select</button>
+            <button class="action-button remove">Remove</button>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+      
+      keyValueList.insertAdjacentHTML('beforeend', itemHtml);
+      
+      // Add event listeners to the new item
+      const itemElement = document.getElementById(item.id) as HTMLDivElement;
+      const keyInput = itemElement.querySelector('.key-input') as HTMLInputElement;
+      const selectButton = itemElement.querySelector('.select-value') as HTMLButtonElement;
+      const removeButton = itemElement.querySelector('.remove') as HTMLButtonElement;
+      
+      // Update key when input changes
+      keyInput.addEventListener('change', () => {
+        jsonBuilderState.updateItemKey(item.id, keyInput.value.trim());
+      });
+      
+      // Start selection when select button is clicked
+      selectButton.addEventListener('click', () => {
+        if (jsonBuilderState.startSelection(item.id)) {
+          startElementSelection(true);
+        } else {
+          alert('Please enter a key name first');
+        }
+      });
+      
+      // Remove item when remove button is clicked
+      removeButton.addEventListener('click', () => {
+        jsonBuilderState.removeItem(item.id);
+      });
+    });
     
-    keyValueList.insertAdjacentHTML('beforeend', itemHtml);
-    
-    // Add event listeners to the new item
-    const newItem = document.getElementById(itemId) as HTMLDivElement;
-    const selectButton = newItem.querySelector('.select-value') as HTMLButtonElement;
-    const removeButton = newItem.querySelector('.remove') as HTMLButtonElement;
-    
-    selectButton.addEventListener('click', () => startElementSelectionForItem(itemId));
-    removeButton.addEventListener('click', () => removeKeyValueItem(itemId));
-    
-    return itemId;
+    // Update the JSON display
+    updateJsonDisplay();
   }
   
-  // Function to remove a key-value item
-  function removeKeyValueItem(itemId: string) {
-    const item = document.getElementById(itemId);
-    if (!item) return;
-    
-    // Get the key from the input
-    const keyInput = item.querySelector('.key-input') as HTMLInputElement;
-    const key = keyInput.value.trim();
-    
-    // Remove the key from the JSON data if it exists
-    if (key && jsonData[key] !== undefined) {
-      delete jsonData[key];
-      updateJsonDisplay();
-    }
-    
-    // Remove the item from the DOM
-    item.remove();
+  // Function to update the JSON display
+  function updateJsonDisplay(): void {
+    jsonDisplay.textContent = JSON.stringify(jsonBuilderState.data, null, 2);
   }
   
-  // Function to start element selection for a specific key-value item
-  function startElementSelectionForItem(itemId: string) {
-    const item = document.getElementById(itemId);
-    if (!item) return;
-    
-    const keyInput = item.querySelector('.key-input') as HTMLInputElement;
-    const key = keyInput.value.trim();
-    
-    if (!key) {
-      alert('Please enter a key name first');
-      return;
+  // Function to update the selection status
+  function updateSelectionStatus(): void {
+    // Update JSON selection status
+    if (jsonBuilderState.isSelectionActive) {
+      jsonSelectionStatus.textContent = jsonBuilderState.isScrollingMode
+        ? 'Scrolling mode active (scroll to navigate, click to select)'
+        : 'Selection mode active (click an element to begin)';
+      jsonSelectionStatus.className = 'status active';
+      
+      // Show or hide live preview based on scrolling mode
+      jsonLivePreviewSection.classList.toggle('hidden', !jsonBuilderState.isScrollingMode);
+      
+      // Disable all select buttons
+      const selectButtons = document.querySelectorAll('.key-value-item .select-value');
+      selectButtons.forEach((button: Element) => {
+        (button as HTMLButtonElement).disabled = true;
+      });
+    } else {
+      jsonSelectionStatus.textContent = 'Selection mode inactive';
+      jsonSelectionStatus.className = 'status inactive';
+      
+      // Hide live preview
+      jsonLivePreviewSection.classList.add('hidden');
+      
+      // Enable all select buttons
+      const selectButtons = document.querySelectorAll('.key-value-item .select-value');
+      selectButtons.forEach((button: Element) => {
+        (button as HTMLButtonElement).disabled = false;
+      });
     }
-    
-    // Set the current key and item ID
-    currentJsonKey = key;
-    currentKeyValueItemId = itemId;
-    
-    // Start element selection in JSON mode
-    startElementSelection(true);
   }
+  
+  // Subscribe to state changes
+  jsonBuilderState.subscribe(() => {
+    renderKeyValueList();
+    updateSelectionStatus();
+  });
   
   // Function to start element selection
   function startElementSelection(forJsonBuilder: boolean = false) {
@@ -157,7 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Element selection started');
       } else {
         console.error('Failed to start element selection:', response?.error || 'Unknown error');
-        setSelectionStatus(false, false, forJsonBuilder);
+        if (forJsonBuilder) {
+          jsonBuilderState.resetSelection();
+        } else {
+          setSelectionStatus(false, false);
+        }
       }
     });
   }
@@ -174,61 +179,47 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             console.error('Failed to stop element selection');
           }
-          setSelectionStatus(false, false, forJsonBuilder);
+          
+          if (forJsonBuilder) {
+            jsonBuilderState.resetSelection();
+          } else {
+            setSelectionStatus(false, false);
+          }
         });
       } else {
         console.error('No active tab found');
-        setSelectionStatus(false, false, forJsonBuilder);
+        if (forJsonBuilder) {
+          jsonBuilderState.resetSelection();
+        } else {
+          setSelectionStatus(false, false);
+        }
       }
     });
   }
   
-  // Function to set selection status
-  function setSelectionStatus(isActive: boolean, isScrollingMode: boolean, forJsonBuilder: boolean = false) {
-    const statusElement = forJsonBuilder ? jsonSelectionStatus : selectionStatus;
-    const startButton = forJsonBuilder ? null : startSelectionButton; // JSON mode uses item-specific buttons
-    const stopButton = forJsonBuilder ? null : stopSelectionButton; // JSON mode doesn't have a stop button
-    const livePreviewElement = forJsonBuilder ? jsonLivePreviewSection : livePreviewSection;
-    
+  // Function to set selection status for the original element selector
+  function setSelectionStatus(isActive: boolean, isScrollingMode: boolean) {
     if (isActive) {
-      statusElement.textContent = isScrollingMode 
+      selectionStatus.textContent = isScrollingMode 
         ? 'Scrolling mode active (scroll to navigate, click to select)' 
         : 'Selection mode active (click an element to begin)';
-      statusElement.className = 'status active';
-      if (startButton) startButton.disabled = true;
-      if (stopButton) stopButton.disabled = false;
+      selectionStatus.className = 'status active';
+      startSelectionButton.disabled = true;
+      stopSelectionButton.disabled = false;
       
       // Show or hide live preview based on scrolling mode
-      livePreviewElement.classList.toggle('hidden', !isScrollingMode);
+      livePreviewSection.classList.toggle('hidden', !isScrollingMode);
       
       // Hide element info when in selection mode
-      if (!forJsonBuilder) {
-        elementInfoSection.classList.add('hidden');
-      }
-      
-      // Disable all select buttons in JSON mode
-      if (forJsonBuilder) {
-        const selectButtons = document.querySelectorAll('.key-value-item .select-value');
-        selectButtons.forEach((button: Element) => {
-          (button as HTMLButtonElement).disabled = true;
-        });
-      }
+      elementInfoSection.classList.add('hidden');
     } else {
-      statusElement.textContent = 'Selection mode inactive';
-      statusElement.className = 'status inactive';
-      if (startButton) startButton.disabled = false;
-      if (stopButton) stopButton.disabled = true;
+      selectionStatus.textContent = 'Selection mode inactive';
+      selectionStatus.className = 'status inactive';
+      startSelectionButton.disabled = false;
+      stopSelectionButton.disabled = true;
       
       // Hide live preview when not in selection mode
-      livePreviewElement.classList.add('hidden');
-      
-      // Enable all select buttons in JSON mode
-      if (forJsonBuilder) {
-        const selectButtons = document.querySelectorAll('.key-value-item .select-value');
-        selectButtons.forEach((button: Element) => {
-          (button as HTMLButtonElement).disabled = false;
-        });
-      }
+      livePreviewSection.classList.add('hidden');
     }
   }
   
@@ -249,8 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function displayElementInfo(info: ElementInfo) {
     // If in JSON selection mode, add to JSON instead
     if (isJsonSelectionMode) {
-      addToJson(currentJsonKey, info.text || '');
-      setSelectionStatus(false, false, true);
+      jsonBuilderState.addSelectedValue(info.text || '');
       return;
     }
     
@@ -267,49 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Hide live preview when showing final selection
     livePreviewSection.classList.add('hidden');
-  }
-  
-  // Function to add a key-value pair to the JSON data
-  function addToJson(key: string, value: string) {
-    if (!key) return;
-    
-    // Add or update the key-value pair
-    jsonData[key] = value;
-    
-    // Update the JSON display
-    updateJsonDisplay();
-    
-    // Update the value display in the key-value item
-    if (currentKeyValueItemId) {
-      const item = document.getElementById(currentKeyValueItemId);
-      if (item) {
-        const valueDisplay = item.querySelector('.value-display') as HTMLDivElement;
-        valueDisplay.textContent = value || 'No text content';
-      }
-      
-      // Reset the current key-value item ID
-      currentKeyValueItemId = null;
-    }
-    
-    // Reset the current key
-    currentJsonKey = '';
-  }
-  
-  // Function to update the JSON display
-  function updateJsonDisplay() {
-    jsonDisplay.textContent = JSON.stringify(jsonData, null, 2);
-  }
-  
-  // Function to clear the JSON data
-  function clearJson() {
-    jsonData = {};
-    updateJsonDisplay();
-    
-    // Clear all key-value items
-    keyValueList.innerHTML = '';
-    
-    // Add a new empty item
-    createKeyValueItem();
   }
   
   // Function to copy text to clipboard
@@ -339,6 +286,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Activate the selected tab
     document.getElementById(tabId + '-panel')?.classList.add('active');
     document.getElementById(tabId + '-tab')?.classList.add('active');
+    
+    // Reset any active selection when switching tabs
+    if (isJsonSelectionMode) {
+      jsonBuilderState.resetSelection();
+      stopElementSelection(true);
+    } else if (selectionStatus.classList.contains('active')) {
+      stopElementSelection(false);
+    }
   }
   
   // Add event listeners for element selector
@@ -346,8 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
   stopSelectionButton.addEventListener('click', () => stopElementSelection(false));
   
   // Add event listeners for JSON builder
-  addKeyButton.addEventListener('click', createKeyValueItem);
-  clearJsonButton.addEventListener('click', clearJson);
+  addKeyButton.addEventListener('click', () => jsonBuilderState.addItem());
+  clearJsonButton.addEventListener('click', () => jsonBuilderState.clear());
   
   // Add event listeners for copy buttons
   copyXpathButton.addEventListener('click', () => copyToClipboard(xpathSelector.textContent || '', copyXpathButton));
@@ -358,27 +313,37 @@ document.addEventListener('DOMContentLoaded', () => {
   selectorTab.addEventListener('click', () => switchTab('selector'));
   jsonTab.addEventListener('click', () => switchTab('json'));
   
-  // Initialize the JSON display
-  updateJsonDisplay();
+  // Add click listener to the JSON selection status to reset selection
+  jsonSelectionStatus.addEventListener('click', () => {
+    if (jsonBuilderState.isSelectionActive) {
+      stopElementSelection(true);
+    }
+  });
   
-  // Create the first key-value item
-  createKeyValueItem();
+  // Initialize the JSON builder
+  jsonBuilderState.addItem();
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {
     switch (message.action) {
       case 'elementSelected':
         displayElementInfo(message.data);
-        setSelectionStatus(false, false, isJsonSelectionMode);
         break;
         
       case 'selectionModeActive':
-        setSelectionStatus(message.data, false, isJsonSelectionMode);
+        if (isJsonSelectionMode) {
+          // Do nothing, state is managed by JsonBuilderState
+        } else {
+          setSelectionStatus(message.data, false);
+        }
         break;
         
       case 'scrollingModeActive':
-        // Only update if scrolling mode is being activated or deactivated
-        setSelectionStatus(true, message.data, isJsonSelectionMode);
+        if (isJsonSelectionMode) {
+          jsonBuilderState.setScrollingMode(message.data);
+        } else {
+          setSelectionStatus(true, message.data);
+        }
         break;
         
       case 'elementHighlighted':
