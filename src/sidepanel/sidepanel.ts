@@ -4,13 +4,15 @@ console.log('Side Panel script loaded');
 
 // Interface for element information
 interface ElementInfo {
+  text: string | null;
+  xpath: string;
+  // We keep these properties in the interface for compatibility with the data sent from elementSelector.ts
+  // but we don't use them in the UI anymore
   tagName: string;
   id: string | null;
   classes: string[];
-  text: string | null;
   attributes: { name: string; value: string }[];
   cssSelector: string;
-  xpath: string;
   html: string;
 }
 

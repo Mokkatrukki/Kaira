@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kaira",
   "version": "1.0",
-  "description": "Kaira Chrome Extension",
+  "description": "A simple web element selector tool for extracting XPath and text content from any webpage",
   "permissions": [
     "sidePanel",
     "activeTab",

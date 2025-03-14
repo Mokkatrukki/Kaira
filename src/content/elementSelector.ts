@@ -1,4 +1,6 @@
 // Element Selector content script for Kaira Chrome extension
+// This script handles element selection, highlighting, and DOM navigation
+// It sends the selected element's text content and XPath to the side panel
 
 // State variables
 let isSelectionActive = false;
@@ -115,6 +117,7 @@ function getElementInfo(element: Element): any {
 // Function to manage the highlight overlay
 const overlay = {
   create: (): HTMLElement => {
+    // Create the main overlay
     const overlay = document.createElement('div');
     overlay.style.position = 'absolute';
     overlay.style.border = '2px solid #1a73e8';
@@ -123,7 +126,27 @@ const overlay = {
     overlay.style.zIndex = '10000';
     overlay.style.boxShadow = '0 0 0 2000px rgba(0, 0, 0, 0.05)';
     overlay.style.transition = 'all 0.2s ease-in-out';
+    
+    // Create the label element
+    const label = document.createElement('div');
+    label.style.position = 'absolute';
+    label.style.top = '-24px';
+    label.style.left = '0';
+    label.style.backgroundColor = '#1a73e8';
+    label.style.color = 'white';
+    label.style.padding = '2px 6px';
+    label.style.borderRadius = '4px';
+    label.style.fontSize = '12px';
+    label.style.fontFamily = 'Arial, sans-serif';
+    label.style.fontWeight = 'bold';
+    label.style.boxShadow = '0 1px 3px rgba(0,0,0,0.3)';
+    label.style.zIndex = '10001';
+    label.id = 'kaira-element-label';
+    
+    // Append the label to the overlay
+    overlay.appendChild(label);
     document.body.appendChild(overlay);
+    
     return overlay;
   },
   
@@ -138,6 +161,22 @@ const overlay = {
     highlightOverlay.style.width = `${rect.width}px`;
     highlightOverlay.style.height = `${rect.height}px`;
     highlightOverlay.style.display = 'block';
+    
+    // Update the label with just the element tag name
+    const label = highlightOverlay.querySelector('#kaira-element-label') as HTMLElement;
+    if (label) {
+      // Show only the tag name for simplicity
+      label.textContent = element.tagName.toLowerCase();
+      
+      // Adjust label position if it would go off-screen
+      if (rect.top < 30) {
+        label.style.top = 'auto';
+        label.style.bottom = '-24px';
+      } else {
+        label.style.top = '-24px';
+        label.style.bottom = 'auto';
+      }
+    }
   },
   
   remove: (): void => {

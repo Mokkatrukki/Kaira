@@ -2,22 +2,16 @@
 
 ## Overview
 
-Kaira is a Chrome extension that provides a powerful web element selection tool, allowing users to easily identify, inspect, and extract information about elements on any webpage. It's designed to help developers, testers, and web scrapers by providing accurate CSS selectors and XPath expressions for any element on a page.
+Kaira is a Chrome extension that provides a simple web element selection tool, allowing users to easily identify, inspect, and extract information about elements on any webpage. It's designed to help developers, testers, and web scrapers by providing XPath expressions and text content for any element on a page.
 
 ## Features
 
 - **Interactive Element Selection**: Click on any element on a webpage to select it
 - **DOM Navigation**: Use scroll wheel to navigate up and down the DOM tree
-- **Element Information**: View detailed information about selected elements:
-  - Tag name
-  - ID and classes
+- **Element Information**: View essential information about selected elements:
   - Text content
-  - CSS selector
   - XPath expression
-  - HTML content
-- **DOM Path Visualization**: See the full path from the selected element to the body
-- **Selector Testing**: Test CSS and XPath selectors to verify they find the correct element
-- **Copy to Clipboard**: Easily copy selectors and text content for use in your code
+- **Copy to Clipboard**: Easily copy XPath and text content for use in your code
 
 ## How It Works
 
@@ -51,17 +45,15 @@ Kaira consists of three main components:
 
 ### Key Components
 
-- **CSS Selector Generation**: Automatically creates unique, minimal CSS selectors for elements
 - **XPath Generation**: Builds XPath expressions to precisely identify elements
 - **Highlight Overlay**: Visual feedback showing the currently selected element
-- **DOM Path Builder**: Creates a navigable path from the selected element to the body
 
 ## Use Cases
 
-- **Web Development**: Quickly find selectors for elements you need to style or manipulate
-- **Test Automation**: Generate reliable selectors for automated testing frameworks
-- **Web Scraping**: Identify the correct selectors for extracting data from websites
-- **Debugging**: Inspect elements and their properties directly on the page
+- **Web Development**: Quickly find XPath for elements you need to manipulate
+- **Test Automation**: Generate reliable XPath expressions for automated testing frameworks
+- **Web Scraping**: Identify the correct XPath for extracting data from websites
+- **Debugging**: Inspect elements and their text content directly on the page
 
 ## How to Use
 
@@ -71,8 +63,8 @@ Kaira consists of three main components:
 4. Click on an element to enter scrolling mode
 5. Use the scroll wheel to navigate the DOM tree (up for parent, down for child)
 6. Click on the highlighted element to select it
-7. View the element's information in the side panel
-8. Copy selectors or test them using the provided buttons
+7. View the element's text content and XPath in the side panel
+8. Copy the text or XPath using the provided buttons
 9. Click "Cancel Selection" at any time to exit selection mode
 
 ## Development
@@ -89,8 +81,7 @@ The extension is built using TypeScript and follows a modular architecture:
 - Save and manage selectors
 - Generate code snippets for popular frameworks
 - Advanced filtering options
-- Custom selector generation rules
 
 ---
 
-Kaira makes web element selection and inspection simple and efficient, providing developers and testers with the tools they need to work with web elements more effectively. 
+Kaira makes web element selection and inspection simple and efficient, providing developers and testers with the essential tools they need to work with web elements more effectively. 

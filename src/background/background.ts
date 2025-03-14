@@ -1,4 +1,6 @@
 // Background script for Kaira Chrome extension
+// This script manages communication between the side panel and content script
+// It handles injection of the content script and message passing
 
 console.log('Background script loaded');
 
