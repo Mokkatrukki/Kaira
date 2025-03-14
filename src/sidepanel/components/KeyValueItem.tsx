@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KeyValueItem as KeyValueItemType } from '../store';
 import { startElementSelection } from '../elementSelection';
 
@@ -19,6 +19,13 @@ const KeyValueItem: React.FC<KeyValueItemProps> = ({
 }) => {
   const [key, setKey] = useState(item.key);
   const [isSelecting, setIsSelecting] = useState(false);
+  
+  // Reset isSelecting when item.value changes (selection completed)
+  useEffect(() => {
+    if (isSelecting && item.value) {
+      setIsSelecting(false);
+    }
+  }, [item.value, isSelecting]);
   
   const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setKey(e.target.value);

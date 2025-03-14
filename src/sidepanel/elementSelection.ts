@@ -26,6 +26,7 @@ export function stopElementSelection(): Promise<boolean> {
         chrome.tabs.sendMessage(tab.id, { action: 'deactivateSelectionMode' }, (response) => {
           if (response?.success) {
             console.log('Element selection stopped successfully');
+            useJsonBuilderStore.getState().resetSelection();
             resolve(true);
           } else {
             console.error('Failed to stop element selection');
@@ -51,7 +52,10 @@ export function setupElementSelectionListeners(): void {
     switch (message.action) {
       case 'elementSelected':
         if (jsonStore.isSelectionActive && message.data) {
+          // Add the selected value and reset selection state
           jsonStore.addSelectedValue(message.data.text || '');
+          // Clear the live preview
+          uiStore.setLivePreviewInfo(null);
         }
         break;
         
