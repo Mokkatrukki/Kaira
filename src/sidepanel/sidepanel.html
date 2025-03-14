@@ -65,6 +65,33 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+    .live-preview {
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: var(--light-background);
+    }
+    .live-preview-content {
+      margin-top: 8px;
+      padding: 8px;
+      background-color: white;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .element-tag {
+      display: inline-block;
+      background-color: #1a73e8;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
@@ -76,6 +103,11 @@
       <button id="stop-selection" disabled>Cancel Selection</button>
     </div>
     <div id="selection-status" class="status inactive">Selection mode inactive</div>
+  </div>
+  
+  <div id="live-preview" class="live-preview hidden">
+    <h3>Current Element: <span id="current-element-tag" class="element-tag">div</span></h3>
+    <div id="live-preview-text" class="live-preview-content">-</div>
   </div>
   
   <div id="element-info" class="hidden">

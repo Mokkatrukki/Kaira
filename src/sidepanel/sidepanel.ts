@@ -16,6 +16,12 @@ interface ElementInfo {
   html: string;
 }
 
+// Interface for live preview information
+interface LivePreviewInfo {
+  tagName: string;
+  text: string | null;
+}
+
 // Store the last selected element info
 let lastSelectedElementInfo: ElementInfo | null = null;
 
@@ -27,6 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const stopSelectionButton = document.getElementById('stop-selection') as HTMLButtonElement;
   const selectionStatus = document.getElementById('selection-status') as HTMLDivElement;
   const elementInfoSection = document.getElementById('element-info') as HTMLDivElement;
+  
+  // Live preview elements
+  const livePreviewSection = document.getElementById('live-preview') as HTMLDivElement;
+  const currentElementTag = document.getElementById('current-element-tag') as HTMLSpanElement;
+  const livePreviewText = document.getElementById('live-preview-text') as HTMLDivElement;
   
   // Element info elements
   const elementText = document.getElementById('element-text') as HTMLDivElement;
@@ -78,12 +89,31 @@ document.addEventListener('DOMContentLoaded', () => {
       selectionStatus.className = 'status active';
       startSelectionButton.disabled = true;
       stopSelectionButton.disabled = false;
+      
+      // Show or hide live preview based on scrolling mode
+      livePreviewSection.classList.toggle('hidden', !isScrollingMode);
+      
+      // Hide element info when in selection mode
+      elementInfoSection.classList.add('hidden');
     } else {
       selectionStatus.textContent = 'Selection mode inactive';
       selectionStatus.className = 'status inactive';
       startSelectionButton.disabled = false;
       stopSelectionButton.disabled = true;
+      
+      // Hide live preview when not in selection mode
+      livePreviewSection.classList.add('hidden');
     }
+  }
+  
+  // Function to update live preview
+  function updateLivePreview(info: LivePreviewInfo) {
+    // Update tag name
+    currentElementTag.textContent = info.tagName;
+    
+    // Update text content - clean it up and display it properly
+    const cleanText = info.text ? info.text.trim().replace(/\s+/g, ' ') : '-';
+    livePreviewText.textContent = cleanText;
   }
   
   // Function to display element information
@@ -98,6 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
     elementText.textContent = info.text ? info.text.replace(/^\s+|\s+$/g, '') || '-' : '-';
     
     xpathSelector.textContent = info.xpath;
+    
+    // Hide live preview when showing final selection
+    livePreviewSection.classList.add('hidden');
   }
   
   // Function to copy text to clipboard
@@ -137,10 +170,14 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
         
       case 'scrollingModeActive':
-        // Only update if scrolling mode is being activated
-        // Ignore deactivation messages to prevent UI state conflicts
+        // Only update if scrolling mode is being activated or deactivated
+        setSelectionStatus(true, message.data);
+        break;
+        
+      case 'elementHighlighted':
+        // Update live preview with currently highlighted element
         if (message.data) {
-          setSelectionStatus(true, message.data);
+          updateLivePreview(message.data);
         }
         break;
     }

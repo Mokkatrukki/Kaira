@@ -137,7 +137,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle messages from the content script
   if (message.action === 'elementSelected' || 
       message.action === 'selectionModeActive' || 
-      message.action === 'scrollingModeActive') {
+      message.action === 'scrollingModeActive' ||
+      message.action === 'elementHighlighted') {
     console.log('Forwarding message from content script to side panel:', message.action);
     // Forward the message to the side panel
     chrome.runtime.sendMessage(message, (response) => {

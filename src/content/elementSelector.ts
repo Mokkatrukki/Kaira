@@ -114,6 +114,24 @@ function getElementInfo(element: Element): any {
   };
 }
 
+// Function to get basic element information for live preview
+function getLivePreviewInfo(element: Element): any {
+  return {
+    tagName: element.tagName.toLowerCase(),
+    text: element.textContent || null
+  };
+}
+
+// Function to send highlighted element info to side panel
+function sendHighlightedElementInfo(element: Element): void {
+  if (!element) return;
+  
+  chrome.runtime.sendMessage({
+    action: 'elementHighlighted',
+    data: getLivePreviewInfo(element)
+  });
+}
+
 // Function to manage the highlight overlay
 const overlay = {
   create: (): HTMLElement => {
@@ -176,6 +194,11 @@ const overlay = {
         label.style.top = '-24px';
         label.style.bottom = 'auto';
       }
+    }
+    
+    // If in scrolling mode, send element info to side panel for live preview
+    if (isScrollingMode) {
+      sendHighlightedElementInfo(element);
     }
   },
   
@@ -271,6 +294,11 @@ const handlers = {
       action: 'scrollingModeActive',
       data: true
     });
+    
+    // Send initial element info for live preview
+    if (highlightedElement) {
+      sendHighlightedElementInfo(highlightedElement);
+    }
   },
   
   // Handle wheel events for DOM navigation
