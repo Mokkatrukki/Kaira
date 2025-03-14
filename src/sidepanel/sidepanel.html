@@ -20,25 +20,6 @@
       background-color: var(--light-background);
       color: #5f6368;
     }
-    .info-section {
-      margin-top: 16px;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 12px;
-      background-color: var(--light-background);
-    }
-    .info-row {
-      display: flex;
-      margin-bottom: 8px;
-    }
-    .info-label {
-      font-weight: bold;
-      width: 100px;
-      flex-shrink: 0;
-    }
-    .info-value {
-      word-break: break-all;
-    }
     .selector-box {
       margin-top: 8px;
       position: relative;
@@ -63,18 +44,6 @@
       margin: 0;
       font-size: 12px;
     }
-    .element-content {
-      margin-top: 16px;
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 12px;
-      background-color: var(--background-color);
-      font-family: monospace;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
     .text-content {
       margin-top: 0;
       max-height: 150px;
@@ -87,38 +56,6 @@
       word-break: break-all;
       line-height: 1.5;
       margin-right: 30px;
-    }
-    .search-section {
-      margin-top: 24px;
-      padding: 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      background-color: var(--light-background);
-    }
-    .search-buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .search-button {
-      padding: 8px 12px;
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .search-button:hover {
-      background-color: var(--primary-color-dark);
-    }
-    .search-result {
-      margin-top: 12px;
-      padding: 8px;
-      border-radius: 4px;
-      background-color: #f1f3f4;
-      white-space: pre-wrap;
-      word-break: break-all;
     }
     .hidden {
       display: none;
@@ -142,66 +79,16 @@
   </div>
   
   <div id="element-info" class="hidden">
-    <h2>Selected Element</h2>
-    
-    <div class="info-section">
-      <div class="info-row">
-        <div class="info-label">Tag:</div>
-        <div id="element-tag" class="info-value">-</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">ID:</div>
-        <div id="element-id" class="info-value">-</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">Classes:</div>
-        <div id="element-classes" class="info-value">-</div>
-      </div>
-    </div>
-    
     <h2>Element Text Content</h2>
     <div class="selector-box">
       <div id="element-text" class="text-content">-</div>
       <button id="copy-text" class="copy-button">Copy</button>
     </div>
     
-    <h2>CSS Selector</h2>
-    <div class="selector-box">
-      <div id="css-selector" class="selector-value">-</div>
-      <button id="copy-css" class="copy-button">Copy</button>
-    </div>
-    
     <h2>XPath</h2>
     <div class="selector-box">
       <div id="xpath-selector" class="selector-value">-</div>
       <button id="copy-xpath" class="copy-button">Copy</button>
-    </div>
-    
-    <h2>Element HTML</h2>
-    <div id="element-html" class="element-content">-</div>
-    
-    <div class="search-section">
-      <h2>Search with Saved Selectors</h2>
-      <p>Use the saved selectors to find the same element on this or other pages.</p>
-      <div class="search-buttons">
-        <button id="search-css" class="search-button">Search with CSS</button>
-        <button id="search-xpath" class="search-button">Search with XPath</button>
-      </div>
-      <div id="search-result" class="search-result hidden">
-        <h3>Search Result</h3>
-        <div class="info-row">
-          <div class="info-label">Element:</div>
-          <div id="found-element-tag" class="info-value">-</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Content:</div>
-          <div id="found-element-text" class="info-value">-</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Status:</div>
-          <div id="search-status" class="info-value">-</div>
-        </div>
-      </div>
     </div>
   </div>
   

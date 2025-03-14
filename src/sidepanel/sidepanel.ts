@@ -27,26 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const elementInfoSection = document.getElementById('element-info') as HTMLDivElement;
   
   // Element info elements
-  const elementTag = document.getElementById('element-tag') as HTMLDivElement;
-  const elementId = document.getElementById('element-id') as HTMLDivElement;
-  const elementClasses = document.getElementById('element-classes') as HTMLDivElement;
   const elementText = document.getElementById('element-text') as HTMLDivElement;
-  const cssSelector = document.getElementById('css-selector') as HTMLDivElement;
   const xpathSelector = document.getElementById('xpath-selector') as HTMLDivElement;
-  const elementHtml = document.getElementById('element-html') as HTMLDivElement;
   
   // Copy buttons
-  const copyCssButton = document.getElementById('copy-css') as HTMLButtonElement;
   const copyXpathButton = document.getElementById('copy-xpath') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copy-text') as HTMLButtonElement;
-  
-  // Search elements
-  const searchCssButton = document.getElementById('search-css') as HTMLButtonElement;
-  const searchXpathButton = document.getElementById('search-xpath') as HTMLButtonElement;
-  const searchResult = document.getElementById('search-result') as HTMLDivElement;
-  const foundElementText = document.getElementById('found-element-text') as HTMLDivElement;
-  const foundElementTag = document.getElementById('found-element-tag') as HTMLDivElement;
-  const searchStatus = document.getElementById('search-status') as HTMLDivElement;
   
   // Function to start element selection
   function startElementSelection() {
@@ -106,68 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show the element info section
     elementInfoSection.classList.remove('hidden');
     
-    // Set element info
-    elementTag.textContent = info.tagName;
-    elementId.textContent = info.id || '-';
-    elementClasses.textContent = info.classes.length > 0 ? info.classes.join(' ') : '-';
-    
     // Handle text content - clean it up and display it properly
     elementText.textContent = info.text ? info.text.replace(/^\s+|\s+$/g, '') || '-' : '-';
     
-    cssSelector.textContent = info.cssSelector;
     xpathSelector.textContent = info.xpath;
-    elementHtml.textContent = info.html;
-    
-    // Hide search result
-    searchResult.classList.add('hidden');
-  }
-  
-  // Function to search for an element using a selector
-  function searchWithSelector(selectorType: 'css' | 'xpath') {
-    if (!lastSelectedElementInfo) {
-      console.error('No element has been selected yet');
-      return;
-    }
-    
-    const selector = selectorType === 'css' 
-      ? lastSelectedElementInfo.cssSelector 
-      : lastSelectedElementInfo.xpath;
-    
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      
-      if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, { 
-          action: 'searchWithSelector', 
-          selectorType,
-          selector 
-        }, (response) => {
-          if (response?.success) {
-            displaySearchResult(response.data);
-          } else {
-            console.error('Failed to find element:', response?.error || 'Element not found');
-            displaySearchResult(null);
-          }
-        });
-      }
-    });
-  }
-  
-  // Function to display search result
-  function displaySearchResult(result: { text: string, tagName: string } | null) {
-    searchResult.classList.remove('hidden');
-    
-    if (result) {
-      foundElementTag.textContent = result.tagName || '-';
-      foundElementText.textContent = result.text || '-';
-      searchStatus.textContent = 'Element found';
-      searchStatus.style.color = 'var(--success-color)';
-    } else {
-      foundElementTag.textContent = '-';
-      foundElementText.textContent = '-';
-      searchStatus.textContent = 'Element not found';
-      searchStatus.style.color = 'var(--error-color)';
-    }
   }
   
   // Function to copy text to clipboard
@@ -189,15 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
   stopSelectionButton.addEventListener('click', stopElementSelection);
   
   // Add event listeners for copy buttons
-  copyCssButton.addEventListener('click', () => copyToClipboard(cssSelector.textContent || '', copyCssButton));
   copyXpathButton.addEventListener('click', () => copyToClipboard(xpathSelector.textContent || '', copyXpathButton));
   if (copyTextButton) {
     copyTextButton.addEventListener('click', () => copyToClipboard(elementText.textContent || '', copyTextButton));
   }
-  
-  // Add event listeners for search buttons
-  searchCssButton.addEventListener('click', () => searchWithSelector('css'));
-  searchXpathButton.addEventListener('click', () => searchWithSelector('xpath'));
   
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((message) => {
