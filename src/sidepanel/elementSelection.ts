@@ -52,8 +52,12 @@ export function setupElementSelectionListeners(): void {
     switch (message.action) {
       case 'elementSelected':
         if (jsonStore.isSelectionActive && message.data) {
-          // Add the selected value and reset selection state
-          jsonStore.addSelectedValue(message.data.text || '');
+          // Add the selected value with xpath and cssSelector
+          jsonStore.addSelectedValue(
+            message.data.text || '',
+            message.data.xpath,
+            message.data.cssSelector
+          );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
         }

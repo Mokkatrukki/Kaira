@@ -5,6 +5,8 @@ export interface KeyValueItem {
   id: string;
   key: string;
   value: string;
+  xpath?: string;
+  cssSelector?: string;
 }
 
 // Interface for element information
@@ -26,11 +28,21 @@ export interface LivePreviewInfo {
   xpath: string;
 }
 
+// Interface for a collected item
+export interface CollectedItem {
+  url: string;
+  timestamp: string;
+  data: Record<string, string>;
+}
+
 // Interface for the JSON builder store
 interface JsonBuilderStore {
   // Data
   data: Record<string, string>;
   items: KeyValueItem[];
+  
+  // Collection
+  collection: CollectedItem[];
   
   // Selection state
   isSelectionActive: boolean;
@@ -46,9 +58,13 @@ interface JsonBuilderStore {
   updateItemKey: (id: string, key: string) => void;
   startSelection: (itemId: string) => boolean;
   setScrollingMode: (isActive: boolean) => void;
-  addSelectedValue: (value: string) => void;
+  addSelectedValue: (value: string, xpath?: string, cssSelector?: string) => void;
   resetSelection: () => void;
   clear: () => void;
+  
+  // Collection actions
+  collectItems: () => Promise<boolean>;
+  clearCollection: () => void;
 }
 
 // Create the store
@@ -56,6 +72,7 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
   // Initial state
   data: {},
   items: [],
+  collection: [],
   isSelectionActive: false,
   isScrollingMode: false,
   currentItemId: null,
@@ -143,7 +160,7 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     set({ isScrollingMode: isActive });
   },
   
-  addSelectedValue: (value: string) => {
+  addSelectedValue: (value: string, xpath?: string, cssSelector?: string) => {
     const { currentItemId, items, data } = get();
     
     if (!currentItemId) return;
@@ -151,9 +168,9 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const item = items.find((item: KeyValueItem) => item.id === currentItemId);
     if (!item) return;
     
-    // Update the item value and data
+    // Update the item value, xpath, cssSelector and data
     const newItems = items.map((i: KeyValueItem) => 
-      i.id === currentItemId ? { ...i, value } : i
+      i.id === currentItemId ? { ...i, value, xpath, cssSelector } : i
     );
     
     const newData = { ...data };
@@ -186,6 +203,107 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
       isScrollingMode: false,
       currentItemId: null
     });
+  },
+  
+  // Collection actions
+  collectItems: async () => {
+    const { items, collection } = get();
+    
+    // Create selectors object for finding elements
+    const selectors: Record<string, { xpath?: string; cssSelector?: string }> = {};
+    items.forEach(item => {
+      if (item.key && (item.xpath || item.cssSelector)) {
+        selectors[item.key] = {
+          xpath: item.xpath,
+          cssSelector: item.cssSelector
+        };
+      }
+    });
+    
+    // If no selectors, return false
+    if (Object.keys(selectors).length === 0) {
+      alert('No selectors available. Please select elements first.');
+      return false;
+    }
+    
+    // Get current URL
+    let url = '';
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      url = tabs[0]?.url || '';
+    } catch (error) {
+      console.error('Error getting current URL:', error);
+    }
+    
+    // Execute script to find elements using selectors
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id! },
+        func: (selectorsParam) => {
+          const selectors = selectorsParam;
+          const results: Record<string, string> = {};
+          
+          // Process each selector type
+          for (const [key, selectorObj] of Object.entries(selectors)) {
+            // Try XPath first
+            if (selectorObj.xpath) {
+              try {
+                const xpathResult = document.evaluate(
+                  selectorObj.xpath,
+                  document,
+                  null,
+                  XPathResult.FIRST_ORDERED_NODE_TYPE,
+                  null
+                ).singleNodeValue;
+                
+                if (xpathResult) {
+                  results[key] = xpathResult.textContent?.trim() || '';
+                  continue; // Skip CSS selector if XPath found the element
+                }
+              } catch (error) {
+                console.error(`Error with XPath for ${key}:`, error);
+              }
+            }
+            
+            // Try CSS selector if XPath didn't work
+            if (selectorObj.cssSelector) {
+              try {
+                const cssResult = document.querySelector(selectorObj.cssSelector);
+                if (cssResult) {
+                  results[key] = cssResult.textContent?.trim() || '';
+                }
+              } catch (error) {
+                console.error(`Error with CSS selector for ${key}:`, error);
+              }
+            }
+          }
+          
+          return results;
+        },
+        args: [selectors]
+      });
+      
+      // Add to collection
+      const collectedData = results[0]?.result || {};
+      const newItem: CollectedItem = {
+        url,
+        timestamp: new Date().toISOString(),
+        data: collectedData
+      };
+      
+      set({
+        collection: [...collection, newItem]
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error executing script:', error);
+      return false;
+    }
+  },
+  
+  clearCollection: () => {
+    set({ collection: [] });
   }
 }));
 

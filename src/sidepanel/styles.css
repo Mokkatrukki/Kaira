@@ -241,6 +241,30 @@
   cursor: not-allowed;
 }
 
+/* Selectors Output Styles */
+.selectors-output {
+  margin-top: 1rem;
+  background-color: #f0f7ff;
+  border: 1px solid #b3d7ff;
+}
+
+.selectors-output h3 {
+  color: #2c6aa0;
+}
+
+.selectors-output pre {
+  background-color: #f8fcff;
+  border-color: #b3d7ff;
+}
+
+.selectors-output .copy-button {
+  background-color: #2c6aa0;
+}
+
+.selectors-output .copy-button:hover {
+  background-color: #1c5a90;
+}
+
 /* Live Preview Styles */
 .live-preview {
   margin-top: 1rem;
@@ -274,4 +298,83 @@
   font-size: 0.9rem;
   max-height: 100px;
   overflow-y: auto;
+}
+
+/* Header Buttons */
+.header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Collect Button */
+.collect-button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.collect-button:hover {
+  background-color: #45a049;
+}
+
+.collect-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+/* Collection Output Styles */
+.collection-output {
+  margin-top: 1rem;
+  background-color: #f5f8f0;
+  border: 1px solid #c5e1a5;
+}
+
+.collection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collection-output h3 {
+  color: #558b2f;
+}
+
+.collection-output pre {
+  background-color: #f9fcf6;
+  border-color: #c5e1a5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.collection-output .copy-button {
+  background-color: #558b2f;
+}
+
+.collection-output .copy-button:hover {
+  background-color: #33691e;
+}
+
+.clear-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.2s;
+}
+
+.clear-button:hover {
+  background-color: #d32f2f;
+}
+
+.clear-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 } 

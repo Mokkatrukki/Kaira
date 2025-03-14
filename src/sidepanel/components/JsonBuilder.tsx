@@ -15,15 +15,38 @@ const JsonBuilder: React.FC = () => {
     startSelection,
     isSelectionActive,
     resetSelection,
-    addSelectedValue 
+    addSelectedValue,
+    collection,
+    collectItems,
+    clearCollection
   } = useJsonBuilderStore();
   
   const [jsonOutput, setJsonOutput] = useState('{}');
+  const [selectorsOutput, setSelectorsOutput] = useState('{}');
+  const [collectionOutput, setCollectionOutput] = useState('[]');
+  const [isCollecting, setIsCollecting] = useState(false);
 
-  // Update JSON output whenever data changes
+  // Update JSON outputs whenever data changes
   useEffect(() => {
     setJsonOutput(JSON.stringify(data, null, 2));
-  }, [data]);
+    
+    // Generate selectors JSON
+    const selectorsData: Record<string, { xpath?: string; cssSelector?: string }> = {};
+    items.forEach(item => {
+      if (item.key) {
+        selectorsData[item.key] = {
+          xpath: item.xpath || '',
+          cssSelector: item.cssSelector || ''
+        };
+      }
+    });
+    setSelectorsOutput(JSON.stringify(selectorsData, null, 2));
+  }, [data, items]);
+
+  // Update collection output whenever collection changes
+  useEffect(() => {
+    setCollectionOutput(JSON.stringify(collection, null, 2));
+  }, [collection]);
 
   // Add escape key listener to cancel selection
   useEffect(() => {
@@ -47,36 +70,61 @@ const JsonBuilder: React.FC = () => {
     updateItemKey(id, newKey);
   };
 
-  const handleUpdateValue = (id: string, newValue: string) => {
-    // Find the item to get its key
-    const item = items.find((item: KeyValueItemType) => item.id === id);
-    if (item && item.key) {
-      // Manually update the data object since there's no direct updateValue method
-      addSelectedValue(newValue);
-    }
-  };
-
   const handleStartValueSelection = (id: string) => {
     startSelection(id);
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(jsonOutput)
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text)
       .then(() => {
-        alert('JSON copied to clipboard!');
+        alert(`${label} copied to clipboard!`);
       })
       .catch(err => {
         console.error('Failed to copy: ', err);
       });
   };
 
+  const handleCollectItems = async () => {
+    setIsCollecting(true);
+    try {
+      const success = await collectItems();
+      if (success) {
+        alert('Items collected successfully!');
+      }
+    } catch (error) {
+      console.error('Error collecting items:', error);
+      alert('Error collecting items. See console for details.');
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+
+  const handleClearCollection = () => {
+    if (confirm('Are you sure you want to clear the collection?')) {
+      clearCollection();
+    }
+  };
+
   return (
     <div className="json-builder">
       <div className="builder-header">
         <h2>JSON Builder</h2>
-        <button className="add-button" onClick={handleAddKeyValuePair} disabled={isSelectionActive}>
-          Add Key-Value Pair
-        </button>
+        <div className="header-buttons">
+          <button 
+            className="add-button" 
+            onClick={handleAddKeyValuePair} 
+            disabled={isSelectionActive}
+          >
+            Add Key-Value Pair
+          </button>
+          <button 
+            className="collect-button" 
+            onClick={handleCollectItems} 
+            disabled={isSelectionActive || isCollecting}
+          >
+            {isCollecting ? 'Collecting...' : 'Collect Items'}
+          </button>
+        </div>
       </div>
 
       {isSelectionActive && (
@@ -100,11 +148,52 @@ const JsonBuilder: React.FC = () => {
       </div>
 
       <div className="json-output">
-        <h3>JSON Output</h3>
+        <h3>Values JSON</h3>
         <pre>{jsonOutput}</pre>
-        <button className="copy-button" onClick={copyToClipboard} disabled={isSelectionActive}>
-          Copy to Clipboard
+        <button 
+          className="copy-button" 
+          onClick={() => copyToClipboard(jsonOutput, 'Values JSON')} 
+          disabled={isSelectionActive}
+        >
+          Copy Values JSON
         </button>
+      </div>
+
+      <div className="json-output selectors-output">
+        <h3>Selectors JSON</h3>
+        <pre>{selectorsOutput}</pre>
+        <button 
+          className="copy-button" 
+          onClick={() => copyToClipboard(selectorsOutput, 'Selectors JSON')} 
+          disabled={isSelectionActive}
+        >
+          Copy Selectors JSON
+        </button>
+      </div>
+
+      <div className="json-output collection-output">
+        <div className="collection-header">
+          <h3>Collection ({collection.length} items)</h3>
+          {collection.length > 0 && (
+            <button 
+              className="clear-button" 
+              onClick={handleClearCollection} 
+              disabled={isSelectionActive}
+            >
+              Clear Collection
+            </button>
+          )}
+        </div>
+        <pre>{collectionOutput}</pre>
+        {collection.length > 0 && (
+          <button 
+            className="copy-button" 
+            onClick={() => copyToClipboard(collectionOutput, 'Collection JSON')} 
+            disabled={isSelectionActive}
+          >
+            Copy Collection JSON
+          </button>
+        )}
       </div>
 
       {showLivePreview && livePreviewInfo && isSelectionActive && (

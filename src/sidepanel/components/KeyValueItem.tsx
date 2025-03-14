@@ -68,6 +68,7 @@ const KeyValueItem: React.FC<KeyValueItemProps> = ({
       <div className="value-display">
         {item.value || 'Click "Select" to choose a value'}
       </div>
+      
       <div className="key-value-actions">
         <button
           className="select-button"
