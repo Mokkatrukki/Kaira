@@ -92,35 +92,190 @@
       font-weight: bold;
       margin-right: 8px;
     }
+    /* New styles for JSON builder */
+    .json-builder {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: var(--light-background);
+    }
+    .json-input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .json-input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+    .json-display {
+      padding: 12px;
+      background-color: #f1f3f4;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+      position: relative;
+    }
+    .json-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .tab-container {
+      margin-top: 20px;
+    }
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .tab-button {
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      color: #5f6368;
+    }
+    .tab-button.active {
+      color: var(--primary-color);
+      border-bottom: 2px solid var(--primary-color);
+    }
+    .tab-content {
+      padding: 16px 0;
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    /* New styles for key-value list */
+    .key-value-list {
+      margin-bottom: 16px;
+    }
+    .key-value-item {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .key-value-item .json-input {
+      flex: 1;
+    }
+    .key-value-item .value-display {
+      flex: 2;
+      padding: 8px;
+      background-color: #f1f3f4;
+      border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 18px;
+    }
+    .key-value-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .action-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--primary-color);
+      padding: 4px;
+      font-size: 14px;
+    }
+    .action-button.remove {
+      color: #d93025;
+    }
+    .add-key-button {
+      margin-top: 8px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>Web Element Selector</h1>
+  <h1>Kaira Web Element Tool</h1>
   
-  <div>
-    <div class="selection-buttons">
-      <button id="start-selection">Select Element</button>
-      <button id="stop-selection" disabled>Cancel Selection</button>
-    </div>
-    <div id="selection-status" class="status inactive">Selection mode inactive</div>
-  </div>
-  
-  <div id="live-preview" class="live-preview hidden">
-    <h3>Current Element: <span id="current-element-tag" class="element-tag">div</span></h3>
-    <div id="live-preview-text" class="live-preview-content">-</div>
-  </div>
-  
-  <div id="element-info" class="hidden">
-    <h2>Element Text Content</h2>
-    <div class="selector-box">
-      <div id="element-text" class="text-content">-</div>
-      <button id="copy-text" class="copy-button">Copy</button>
+  <div class="tab-container">
+    <div class="tab-buttons">
+      <button id="selector-tab" class="tab-button active">Element Selector</button>
+      <button id="json-tab" class="tab-button">JSON Builder</button>
     </div>
     
-    <h2>XPath</h2>
-    <div class="selector-box">
-      <div id="xpath-selector" class="selector-value">-</div>
-      <button id="copy-xpath" class="copy-button">Copy</button>
+    <div class="tab-content">
+      <!-- Element Selector Tab -->
+      <div id="selector-panel" class="tab-panel active">
+        <div>
+          <div class="selection-buttons">
+            <button id="start-selection">Select Element</button>
+            <button id="stop-selection" disabled>Cancel Selection</button>
+          </div>
+          <div id="selection-status" class="status inactive">Selection mode inactive</div>
+        </div>
+        
+        <div id="live-preview" class="live-preview hidden">
+          <h3>Current Element: <span id="current-element-tag" class="element-tag">div</span></h3>
+          <div id="live-preview-text" class="live-preview-content">-</div>
+        </div>
+        
+        <div id="element-info" class="hidden">
+          <h2>Element Text Content</h2>
+          <div class="selector-box">
+            <div id="element-text" class="text-content">-</div>
+            <button id="copy-text" class="copy-button">Copy</button>
+          </div>
+          
+          <h2>XPath</h2>
+          <div class="selector-box">
+            <div id="xpath-selector" class="selector-value">-</div>
+            <button id="copy-xpath" class="copy-button">Copy</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- JSON Builder Tab -->
+      <div id="json-panel" class="tab-panel">
+        <div class="json-builder">
+          <h2>Build JSON from Web Elements</h2>
+          
+          <!-- Key-Value List -->
+          <div id="key-value-list" class="key-value-list">
+            <!-- Key-value items will be added here dynamically -->
+          </div>
+          
+          <button id="add-key-button" class="add-key-button">+ Add New Key</button>
+          
+          <div id="json-selection-status" class="status inactive">Selection mode inactive</div>
+          
+          <div id="json-live-preview" class="live-preview hidden">
+            <h3>Current Element: <span id="json-current-element-tag" class="element-tag">div</span></h3>
+            <div id="json-live-preview-text" class="live-preview-content">-</div>
+          </div>
+          
+          <h3>JSON Output</h3>
+          <div class="selector-box">
+            <div id="json-display" class="json-display">{}</div>
+            <button id="copy-json" class="copy-button">Copy</button>
+          </div>
+          
+          <div class="json-actions">
+            <button id="clear-json">Clear JSON</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   
