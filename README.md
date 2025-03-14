@@ -6,6 +6,23 @@ A Chrome extension for building JSON objects by selecting elements from web page
 
 Kaira is built as a Chrome extension with a React-based UI and Zustand for state management. The extension allows users to create JSON objects by selecting elements from web pages and extracting their text content.
 
+## Evolution of the Architecture
+
+The project has evolved from a vanilla JavaScript/TypeScript implementation to a modern React-based architecture:
+
+### Initial Implementation
+- Used vanilla TypeScript with a class-based state management approach
+- Implemented the Simple State Pattern with a `JsonBuilderState` class
+- Managed DOM updates manually
+
+### Current Implementation
+- React-based UI components for better maintainability and composability
+- Zustand for state management, providing a simpler and more flexible approach
+- Clear separation of concerns between UI components and state management
+- Improved developer experience with React's declarative paradigm
+
+This migration has resulted in more maintainable code, better separation of concerns, and a more modern development experience.
+
 ## Project Structure
 
 ```
@@ -14,9 +31,6 @@ src/
 │   └── background.ts    # Handles extension lifecycle and messaging
 ├── content/             # Content scripts injected into web pages
 │   └── elementSelector.ts # Handles element selection in web pages
-├── popup/               # Extension popup UI
-│   └── popup.html       # Popup HTML
-│   └── popup.ts         # Popup script
 ├── sidepanel/          # Side panel UI (main feature)
 │   ├── components/     # React components
 │   │   ├── JsonBuilder.tsx    # Main JSON builder component
@@ -85,6 +99,37 @@ interface State {
 }
 ```
 
+### Comparison with Previous State Management
+
+The previous implementation used a class-based approach with the Simple State Pattern:
+
+```typescript
+// Old approach (JsonBuilderState class)
+export class JsonBuilderState {
+  private _data: Record<string, string> = {};
+  private _items: KeyValueItem[] = [];
+  private _isSelectionActive: boolean = false;
+  // ...other private state
+
+  // Getters and methods to update state
+  get data(): Record<string, string> { /* ... */ }
+  addItem(): string { /* ... */ }
+  removeItem(id: string): void { /* ... */ }
+  // ...other methods
+
+  // Subscription system
+  subscribe(listener: StateChangeListener): () => void { /* ... */ }
+  private _notifyListeners(): void { /* ... */ }
+}
+```
+
+Zustand provides several advantages over this approach:
+- Less boilerplate code
+- Built-in React integration with hooks
+- Automatic re-rendering when state changes
+- Easier state updates with immutable patterns
+- Better TypeScript integration
+
 ## Component Architecture
 
 ### React Component Hierarchy
@@ -125,6 +170,10 @@ React UI <-> Zustand Store <-> Chrome Messaging API <-> Content Script <-> Web P
 2. **Zustand Store to Chrome Messaging**: Element selection utilities use the store and send messages via Chrome API
 3. **Chrome Messaging to Content Script**: Background script relays messages to the content script
 4. **Content Script to Web Page**: Content script interacts with the web page DOM
+
+## Extension Behavior
+
+When the user clicks the extension icon in the Chrome toolbar, the side panel opens automatically. This provides a streamlined user experience without the need for an intermediate popup.
 
 ## Building and Deployment
 

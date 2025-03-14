@@ -7,7 +7,6 @@ module.exports = {
   entry: {
     background: './src/background/background.ts',
     sidepanel: './src/sidepanel/index.tsx',
-    popup: './src/popup/popup.ts',
     elementSelector: './src/content/elementSelector.ts'
   },
   output: {
@@ -35,7 +34,6 @@ module.exports = {
       patterns: [
         { from: 'src/manifest.json', to: '../' },
         { from: 'src/sidepanel/sidepanel.html', to: '../' },
-        { from: 'src/popup/popup.html', to: '../' },
         { from: 'src/styles', to: '../styles', noErrorOnMissing: true }
       ]
     })
