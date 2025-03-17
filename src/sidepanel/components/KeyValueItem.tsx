@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeyValueItem as KeyValueItemType } from '../store';
+import { KeyValueItem as KeyValueItemType, useJsonBuilderStore } from '../store';
 import { startElementSelection } from '../elementSelection';
 
 interface KeyValueItemProps {
@@ -19,6 +19,7 @@ const KeyValueItem: React.FC<KeyValueItemProps> = ({
 }) => {
   const [key, setKey] = useState(item.key);
   const [isSelecting, setIsSelecting] = useState(false);
+  const isSelectionActive = useJsonBuilderStore(state => state.isSelectionActive);
   
   // Reset isSelecting when item.value changes (selection completed)
   useEffect(() => {
@@ -26,6 +27,13 @@ const KeyValueItem: React.FC<KeyValueItemProps> = ({
       setIsSelecting(false);
     }
   }, [item.value, isSelecting]);
+  
+  // Reset isSelecting when isSelectionActive becomes false (selection canceled)
+  useEffect(() => {
+    if (!isSelectionActive && isSelecting) {
+      setIsSelecting(false);
+    }
+  }, [isSelectionActive, isSelecting]);
   
   const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setKey(e.target.value);

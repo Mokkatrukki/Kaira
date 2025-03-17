@@ -10,6 +10,7 @@ Kaira helps you build JSON objects by selecting elements from web pages:
 2. Add key-value pairs to your JSON
 3. Select elements from the webpage to extract their text as values
 4. Export the resulting JSON for use in your projects
+5. Collect data from multiple pages using the same selectors
 
 Perfect for web scraping, test automation, and data extraction tasks.
 
@@ -30,6 +31,11 @@ Perfect for web scraping, test automation, and data extraction tasks.
 - **State Management**: Zustand stores for managing application state
   - `useJsonBuilderStore`: Manages JSON data and selection state
   - `useStore`: Manages UI-related state like live preview
+
+- **Data Collection**: System for collecting data from multiple pages
+  - Selectors-based element finding
+  - Collection of items with metadata (URL, timestamp)
+  - Export of collected data as JSON
 
 ### Project Structure
 
@@ -62,6 +68,15 @@ src/
 
 3. **Export Your JSON**
    - Copy the JSON output displayed at the bottom of the panel
+   - You can copy either the Values JSON or the Selectors JSON
+
+4. **Collect Data from Multiple Pages**
+   - After selecting elements and building your selectors
+   - Click "Collect Items" to extract data from the current page
+   - Navigate to another page with similar structure
+   - Click "Collect Items" again to add more data to your collection
+   - The collection includes URL and timestamp for each item
+   - Copy the Collection JSON when you're done
 
 ## Development Principles
 
@@ -101,6 +116,8 @@ interface KeyValueItem {
   id: string;
   key: string;
   value: string;
+  xpath?: string;
+  cssSelector?: string;
 }
 
 // LivePreviewInfo for displaying element information
@@ -108,6 +125,13 @@ interface LivePreviewInfo {
   tagName: string;
   text: string;
   xpath: string;
+}
+
+// CollectedItem for storing collected data
+interface CollectedItem {
+  url: string;
+  timestamp: string;
+  data: Record<string, string>;
 }
 ```
 
@@ -130,7 +154,7 @@ The extension uses Chrome's messaging API with the following message formats:
 
 { 
   action: 'elementSelected', 
-  data: { text: string, xpath: string } 
+  data: { text: string, xpath: string, cssSelector: string } 
 }
 
 { 
@@ -147,9 +171,12 @@ The extension uses Chrome's messaging API with the following message formats:
    - Content script activates selection mode → user selects element
    - Selection data sent back → `setupElementSelectionListeners()` processes → updates store
 
-2. **State Reset Flow**:
-   - Selection completes → `elementSelected` handler → `addSelectedValue()` → `resetSelection()`
-   - Component detects value change → `useEffect` hook → `setIsSelecting(false)`
+2. **Data Collection Flow**:
+   - User clicks "Collect Items" → `handleCollectItems()` → `collectItems()`
+   - Store creates selectors object from items
+   - Script executed in page context to find elements using selectors
+   - Results added to collection with URL and timestamp
+   - Collection JSON updated to show collected items
 
 ### Debugging Tips
 
