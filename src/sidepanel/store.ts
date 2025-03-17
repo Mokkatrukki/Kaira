@@ -393,18 +393,63 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const item = items.find((item: KeyValueItem) => item.id === currentItemId);
     if (!item || !item.rootFullXPath) return;
     
+    // Extract the relative XPath by removing the root XPath from the full XPath
+    let relativeXPath = '';
+    if (fullXPath.startsWith(item.rootFullXPath)) {
+      relativeXPath = fullXPath.substring(item.rootFullXPath.length);
+      // If the relative path starts with a slash, remove it
+      if (relativeXPath.startsWith('/')) {
+        relativeXPath = relativeXPath.substring(1);
+      }
+    } else {
+      // If the fullXPath doesn't start with rootFullXPath, try to find a common prefix
+      const rootParts = item.rootFullXPath.split('/');
+      const fullParts = fullXPath.split('/');
+      let commonPrefixLength = 0;
+      
+      for (let i = 0; i < Math.min(rootParts.length, fullParts.length); i++) {
+        if (rootParts[i] === fullParts[i]) {
+          commonPrefixLength++;
+        } else {
+          break;
+        }
+      }
+      
+      if (commonPrefixLength > 0) {
+        relativeXPath = fullParts.slice(commonPrefixLength).join('/');
+      } else {
+        // Fallback: just use the tag name as a simple selector
+        const tagMatch = fullXPath.match(/\/([^\/\[\]]+)(?:\[\d+\])?$/);
+        if (tagMatch) {
+          relativeXPath = tagMatch[1];
+        } else {
+          console.error('Could not extract relative XPath from', fullXPath);
+          relativeXPath = fullXPath; // Use full XPath as a fallback
+        }
+      }
+    }
+    
+    console.log('Extracted relative XPath:', relativeXPath);
+    
+    // Make the relative XPath more generic by removing index selectors [n]
+    // This will match all similar elements, not just the specific one selected
+    const genericRelativeXPath = relativeXPath.replace(/\[\d+\]/g, '');
+    
+    console.log('Generic relative XPath:', genericRelativeXPath);
+    
     // Get the current list items or initialize an empty array
     const currentListItems = Array.isArray(item.listItems) ? [...item.listItems] : [];
     
     // Add the new value to the list
     currentListItems.push(value);
     
-    // Update the item with the new list items
+    // Update the item with the new list items and the relative XPath
     const updatedItems = items.map((i: KeyValueItem) => 
       i.id === currentItemId ? { 
         ...i, 
         listItems: currentListItems,
-        value: JSON.stringify(currentListItems)
+        value: JSON.stringify(currentListItems),
+        relativeXPath: genericRelativeXPath
       } : i
     );
     
@@ -425,8 +470,13 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     // Highlight the selected item temporarily
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       try {
+        if (!tabs[0]?.id) {
+          console.error('No active tab found');
+          return;
+        }
+        
         await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id! },
+          target: { tabId: tabs[0].id },
           func: (itemXPath) => {
             try {
               // Find the selected item
@@ -459,14 +509,19 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
                   // Element might no longer be in the DOM, ignore
                 }
               }, 1500);
+              
+              return true; // Return a value to prevent "message port closed" error
             } catch (error) {
               console.error('Error highlighting selected item:', error);
+              return false; // Return a value to prevent "message port closed" error
             }
           },
           args: [fullXPath]
+        }).catch(error => {
+          console.error('Error executing script for item highlight:', error);
         });
       } catch (error) {
-        console.error('Error executing script for item highlight:', error);
+        console.error('Error with chrome.tabs.query or chrome.scripting.executeScript:', error);
       }
     });
   },
@@ -557,22 +612,32 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
         xpath?: string;
         cssSelector?: string;
       };
-      relativeXPath?: string;
+      itemSelector?: {
+        relativeXPath: string;
+      };
     }> = {};
     
     items.forEach(item => {
       if (item.key) {
         if (item.isList && item.rootFullXPath) {
-          // For list items, include root element information
-          selectors[item.key] = {
+          // For list items, include root element information and item selectors
+          const listSelector: any = {
             type: 'list',
             rootElement: {
               fullXPath: item.rootFullXPath,
               xpath: item.xpath || '',
               cssSelector: item.cssSelector || ''
-            },
-            relativeXPath: item.relativeXPath
+            }
           };
+          
+          // Add item selector information if available
+          if (item.relativeXPath) {
+            listSelector.itemSelector = {
+              relativeXPath: item.relativeXPath
+            };
+          }
+          
+          selectors[item.key] = listSelector;
         } else if (item.xpath || item.cssSelector || item.fullXPath) {
           // For regular items, include the standard selectors
           selectors[item.key] = {
@@ -611,7 +676,7 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
           // Process each selector type
           for (const [key, selectorObj] of Object.entries(selectors)) {
             // Handle list items
-            if (selectorObj.type === 'list' && selectorObj.rootElement?.fullXPath && selectorObj.relativeXPath) {
+            if (selectorObj.type === 'list' && selectorObj.rootElement?.fullXPath) {
               try {
                 // First, find the root element
                 const rootElement = document.evaluate(
@@ -623,127 +688,132 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
                 ).singleNodeValue;
                 
                 if (rootElement) {
-                  // Now find all elements matching the relative XPath within the root
-                  const relativeXPath = selectorObj.relativeXPath;
-                  
-                  // Create a more specific XPath for evaluation by adding wildcards for indices
-                  // This will match all elements with the same structure
-                  const xpathForEvaluation = `.${relativeXPath.replace(/\/([^\/]+)(?!\[)/g, '/$1[*]')}`;
-                  console.log('XPath for evaluation:', xpathForEvaluation);
-                  
-                  try {
-                    const xpathResult = document.evaluate(
-                      xpathForEvaluation,
-                      rootElement,
-                      null,
-                      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                      null
-                    );
+                  // If we have an item selector, use it to find all matching items
+                  if (selectorObj.itemSelector?.relativeXPath) {
+                    const relativeXPath = selectorObj.itemSelector.relativeXPath;
                     
-                    console.log(`Found ${xpathResult.snapshotLength} matching elements`);
+                    // Create a more specific XPath for evaluation by adding wildcards for indices
+                    // This will match all elements with the same structure
+                    const xpathForEvaluation = `.${relativeXPath.replace(/\/([^\/]+)(?!\[)/g, '/$1[*]')}`;
+                    console.log('XPath for evaluation:', xpathForEvaluation);
                     
-                    // Extract text from all matching elements
-                    const listItems: string[] = [];
-                    const elementsToHighlight = [];
-                    
-                    for (let i = 0; i < xpathResult.snapshotLength; i++) {
-                      const node = xpathResult.snapshotItem(i);
-                      if (node) {
-                        listItems.push(node.textContent?.trim() || '');
-                        elementsToHighlight.push(node);
-                      }
-                    }
-                    
-                    // Highlight all found elements temporarily
                     try {
-                      elementsToHighlight.forEach((element) => {
-                        try {
-                          const el = element as HTMLElement;
-                          // Store original styles
-                          const originalBackground = el.style.backgroundColor;
-                          const originalColor = el.style.color;
-                          const originalOutline = el.style.outline;
-                          
-                          // Apply highlight
-                          el.style.backgroundColor = "rgba(76, 175, 80, 0.3)"; // Green with transparency
-                          el.style.outline = "2px solid #4CAF50";
-                          
-                          // Reset after 3 seconds
-                          setTimeout(() => {
-                            try {
-                              el.style.backgroundColor = originalBackground;
-                              el.style.color = originalColor;
-                              el.style.outline = originalOutline;
-                            } catch (e) {
-                              // Element might no longer be in the DOM, ignore
-                            }
-                          }, 3000);
-                        } catch (elementError) {
-                          console.error('Error highlighting individual element:', elementError);
+                      const xpathResult = document.evaluate(
+                        xpathForEvaluation,
+                        rootElement,
+                        null,
+                        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+                        null
+                      );
+                      
+                      console.log(`Found ${xpathResult.snapshotLength} matching elements`);
+                      
+                      // Extract text from all matching elements
+                      const listItems: string[] = [];
+                      const elementsToHighlight = [];
+                      
+                      for (let i = 0; i < xpathResult.snapshotLength; i++) {
+                        const node = xpathResult.snapshotItem(i);
+                        if (node) {
+                          listItems.push(node.textContent?.trim() || '');
+                          elementsToHighlight.push(node);
                         }
-                      });
-                    } catch (highlightError) {
-                      console.error('Error highlighting elements:', highlightError);
-                    }
-                    
-                    results[key] = listItems;
-                  } catch (error) {
-                    console.error(`Error evaluating XPath ${xpathForEvaluation}:`, error);
-                    
-                    // Fallback: try a simpler approach by selecting all elements of the same type
-                    try {
-                      // Extract the last element type from the XPath (e.g., "a" from "/li/div/div/div/h3/a")
-                      const lastElementMatch = relativeXPath.match(/\/([^\/]+)$/);
-                      if (lastElementMatch && lastElementMatch[1]) {
-                        const elementType = lastElementMatch[1];
-                        console.log(`Fallback: selecting all ${elementType} elements under root`);
-                        
-                        // Cast rootElement to HTMLElement to use querySelectorAll
-                        const elements = (rootElement as HTMLElement).querySelectorAll(elementType);
-                        console.log(`Found ${elements.length} ${elementType} elements`);
-                        
-                        const listItems: string[] = [];
-                        elements.forEach((element: Element) => {
-                          listItems.push(element.textContent?.trim() || '');
+                      }
+                      
+                      // Highlight all found elements temporarily
+                      try {
+                        elementsToHighlight.forEach((element) => {
+                          try {
+                            const el = element as HTMLElement;
+                            // Store original styles
+                            const originalBackground = el.style.backgroundColor;
+                            const originalColor = el.style.color;
+                            const originalOutline = el.style.outline;
+                            
+                            // Apply highlight
+                            el.style.backgroundColor = "rgba(76, 175, 80, 0.3)"; // Green with transparency
+                            el.style.outline = "2px solid #4CAF50";
+                            
+                            // Reset after 3 seconds
+                            setTimeout(() => {
+                              try {
+                                el.style.backgroundColor = originalBackground;
+                                el.style.color = originalColor;
+                                el.style.outline = originalOutline;
+                              } catch (e) {
+                                // Element might no longer be in the DOM, ignore
+                              }
+                            }, 3000);
+                          } catch (elementError) {
+                            console.error('Error highlighting individual element:', elementError);
+                          }
                         });
-                        
-                        // Highlight all found elements temporarily
-                        try {
-                          Array.from(elements).forEach((element) => {
-                            try {
-                              const el = element as HTMLElement;
-                              // Store original styles
-                              const originalBackground = el.style.backgroundColor;
-                              const originalColor = el.style.color;
-                              const originalOutline = el.style.outline;
-                              
-                              // Apply highlight
-                              el.style.backgroundColor = "rgba(76, 175, 80, 0.3)"; // Green with transparency
-                              el.style.outline = "2px solid #4CAF50";
-                              
-                              // Reset after 3 seconds
-                              setTimeout(() => {
-                                try {
-                                  el.style.backgroundColor = originalBackground;
-                                  el.style.color = originalColor;
-                                  el.style.outline = originalOutline;
-                                } catch (e) {
-                                  // Element might no longer be in the DOM, ignore
-                                }
-                              }, 3000);
-                            } catch (elementError) {
-                              console.error('Error highlighting individual element:', elementError);
-                            }
-                          });
-                        } catch (highlightError) {
-                          console.error('Error highlighting elements:', highlightError);
-                        }
-                        
-                        results[key] = listItems;
+                      } catch (highlightError) {
+                        console.error('Error highlighting elements:', highlightError);
                       }
-                    } catch (fallbackError) {
-                      console.error('Fallback selection failed:', fallbackError);
+                      
+                      results[key] = listItems;
+                    } catch (error) {
+                      console.error(`Error evaluating XPath ${xpathForEvaluation}:`, error);
+                      
+                      // Fallback: try a simpler approach by selecting all elements of the same type
+                      try {
+                        // Extract the last element type from the XPath (e.g., "a" from "/li/div/div/div/h3/a")
+                        const lastElementMatch = relativeXPath.match(/\/([^\/]+)$/);
+                        if (lastElementMatch && lastElementMatch[1]) {
+                          const elementType = lastElementMatch[1];
+                          console.log(`Fallback: selecting all ${elementType} elements under root`);
+                          
+                          // Cast rootElement to HTMLElement to use querySelectorAll
+                          const elements = (rootElement as HTMLElement).querySelectorAll(elementType);
+                          console.log(`Found ${elements.length} ${elementType} elements`);
+                          
+                          const listItems: string[] = [];
+                          elements.forEach((element: Element) => {
+                            listItems.push(element.textContent?.trim() || '');
+                          });
+                          
+                          // Highlight all found elements temporarily
+                          try {
+                            Array.from(elements).forEach((element) => {
+                              try {
+                                const el = element as HTMLElement;
+                                // Store original styles
+                                const originalBackground = el.style.backgroundColor;
+                                const originalColor = el.style.color;
+                                const originalOutline = el.style.outline;
+                                
+                                // Apply highlight
+                                el.style.backgroundColor = "rgba(76, 175, 80, 0.3)"; // Green with transparency
+                                el.style.outline = "2px solid #4CAF50";
+                                
+                                // Reset after 3 seconds
+                                setTimeout(() => {
+                                  try {
+                                    el.style.backgroundColor = originalBackground;
+                                    el.style.color = originalColor;
+                                    el.style.outline = originalOutline;
+                                  } catch (e) {
+                                    // Element might no longer be in the DOM, ignore
+                                  }
+                                }, 3000);
+                              } catch (elementError) {
+                                console.error('Error highlighting individual element:', elementError);
+                              }
+                            });
+                          } catch (highlightError) {
+                            console.error('Error highlighting elements:', highlightError);
+                          }
+                          
+                          results[key] = listItems;
+                        }
+                      } catch (fallbackError) {
+                        console.error('Fallback selection failed:', fallbackError);
+                      }
                     }
+                  } else {
+                    // No item selector, just return an empty array
+                    results[key] = [];
                   }
                   
                   continue;

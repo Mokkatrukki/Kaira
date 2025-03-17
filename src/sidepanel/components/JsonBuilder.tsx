@@ -41,8 +41,8 @@ const JsonBuilder: React.FC = () => {
     items.forEach(item => {
       if (item.key) {
         if (item.isList && item.rootFullXPath) {
-          // For list items, include root element information
-          selectorsData[item.key] = {
+          // For list items, include root element information and item selectors
+          const listSelector: any = {
             type: 'list',
             rootElement: {
               fullXPath: item.rootFullXPath,
@@ -50,6 +50,15 @@ const JsonBuilder: React.FC = () => {
               cssSelector: item.cssSelector || ''
             }
           };
+          
+          // Add item selector information if available
+          if (item.relativeXPath) {
+            listSelector.itemSelector = {
+              relativeXPath: item.relativeXPath
+            };
+          }
+          
+          selectorsData[item.key] = listSelector;
         } else {
           // For regular key-value items
           selectorsData[item.key] = {

@@ -4,6 +4,13 @@ import { useJsonBuilderStore, useStore, LivePreviewInfo } from './store';
 export function startElementSelection(): Promise<boolean> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: 'startElementSelection' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error starting element selection:', chrome.runtime.lastError);
+        useJsonBuilderStore.getState().resetSelection();
+        resolve(false);
+        return;
+      }
+      
       if (response?.success) {
         console.log('Element selection started');
         resolve(true);
@@ -22,30 +29,38 @@ export function stopElementSelection(): Promise<boolean> {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
       
-      if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, { action: 'deactivateSelectionMode' }, (response) => {
-          if (response?.success) {
-            console.log('Element selection stopped successfully');
-            useJsonBuilderStore.getState().resetSelection();
-            resolve(true);
-          } else {
-            console.error('Failed to stop element selection');
-            useJsonBuilderStore.getState().resetSelection();
-            resolve(false);
-          }
-        });
-      } else {
+      if (!tab?.id) {
         console.error('No active tab found');
         useJsonBuilderStore.getState().resetSelection();
         resolve(false);
+        return;
       }
+      
+      chrome.tabs.sendMessage(tab.id, { action: 'deactivateSelectionMode' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error stopping element selection:', chrome.runtime.lastError);
+          useJsonBuilderStore.getState().resetSelection();
+          resolve(false);
+          return;
+        }
+        
+        if (response?.success) {
+          console.log('Element selection stopped successfully');
+          useJsonBuilderStore.getState().resetSelection();
+          resolve(true);
+        } else {
+          console.error('Failed to stop element selection');
+          useJsonBuilderStore.getState().resetSelection();
+          resolve(false);
+        }
+      });
     });
   });
 }
 
 // Setup message listeners for element selection
 export function setupElementSelectionListeners(): void {
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const jsonStore = useJsonBuilderStore.getState();
     const uiStore = useStore.getState();
     
@@ -61,6 +76,8 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
+          // Send response to prevent message port closed error
+          sendResponse({ success: true });
         } else if (jsonStore.isRootSelectionActive && message.data) {
           // Add the selected root element for a list
           jsonStore.addSelectedRootValue(
@@ -68,6 +85,8 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
+          // Send response to prevent message port closed error
+          sendResponse({ success: true });
         } else if (jsonStore.isItemSelectionActive && message.data) {
           // Add the selected item to the list
           jsonStore.addSelectedItemValue(
@@ -76,12 +95,22 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
+          // Send response to prevent message port closed error
+          sendResponse({ success: true });
+        } else {
+          // Send response to prevent message port closed error
+          sendResponse({ success: false, error: 'No active selection mode' });
         }
         break;
         
       case 'scrollingModeActive':
         if (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive || jsonStore.isItemSelectionActive) {
           jsonStore.setScrollingMode(message.data);
+          // Send response to prevent message port closed error
+          sendResponse({ success: true });
+        } else {
+          // Send response to prevent message port closed error
+          sendResponse({ success: false, error: 'No active selection mode' });
         }
         break;
         
@@ -96,8 +125,21 @@ export function setupElementSelectionListeners(): void {
           };
           uiStore.setLivePreviewInfo(previewInfo);
           uiStore.setShowLivePreview(true);
+          // Send response to prevent message port closed error
+          sendResponse({ success: true });
+        } else {
+          // Send response to prevent message port closed error
+          sendResponse({ success: false, error: 'No active selection mode' });
         }
         break;
+        
+      default:
+        // Send response to prevent message port closed error
+        sendResponse({ success: false, error: 'Unknown action' });
+        break;
     }
+    
+    // Return true to indicate that the response will be sent asynchronously
+    return true;
   });
 } 
