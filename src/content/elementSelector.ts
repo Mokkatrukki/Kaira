@@ -14,40 +14,62 @@ function generateCssSelector(element: Element): string {
     return 'body';
   }
   
-  // If element has an ID, use that
-  if (element.id) {
+  // Check if element has a short, simple ID (avoid long tokens)
+  if (element.id && element.id.length < 20 && !/[^\w-]/.test(element.id)) {
     return `#${element.id}`;
   }
   
-  // If element has a unique class, use that
+  // Try to find a unique, simple class
   if (element.classList.length > 0) {
     const uniqueClass = Array.from(element.classList).find(className => 
+      className.length < 20 && 
+      !/[^\w-]/.test(className) &&
       document.querySelectorAll(`.${className}`).length === 1
     );
     
     if (uniqueClass) {
       return `.${uniqueClass}`;
     }
+    
+    // Try to find a class that has few instances (less than 5)
+    const rareClass = Array.from(element.classList).find(className => 
+      className.length < 20 && 
+      !/[^\w-]/.test(className) &&
+      document.querySelectorAll(`.${className}`).length < 5
+    );
+    
+    if (rareClass) {
+      // Use tag name with class for more specificity
+      return `${element.tagName.toLowerCase()}.${rareClass}`;
+    }
   }
   
-  // Otherwise, use the tag name and position
-  const parent = element.parentElement;
-  if (!parent) {
-    return element.tagName.toLowerCase();
-  }
+  // Generate a path-based selector
+  const generatePathSelector = (el: Element): string => {
+    if (!el || el === document.body) {
+      return 'body';
+    }
+    
+    const parent = el.parentElement;
+    if (!parent) {
+      return el.tagName.toLowerCase();
+    }
+    
+    const tagName = el.tagName.toLowerCase();
+    const siblings = Array.from(parent.children);
+    const sameTagSiblings = siblings.filter(sibling => 
+      sibling.tagName.toLowerCase() === tagName
+    );
+    
+    if (sameTagSiblings.length === 1) {
+      return `${generatePathSelector(parent)} > ${tagName}`;
+    }
+    
+    const index = Array.from(sameTagSiblings).indexOf(el) + 1;
+    return `${generatePathSelector(parent)} > ${tagName}:nth-child(${index})`;
+  };
   
-  const siblings = Array.from(parent.children);
-  const tagName = element.tagName.toLowerCase();
-  const sameTagSiblings = siblings.filter(sibling => 
-    sibling.tagName.toLowerCase() === tagName
-  );
-  
-  if (sameTagSiblings.length === 1) {
-    return `${generateCssSelector(parent)} > ${tagName}`;
-  }
-  
-  const index = sameTagSiblings.indexOf(element as Element) + 1;
-  return `${generateCssSelector(parent)} > ${tagName}:nth-child(${index})`;
+  return generatePathSelector(element);
 }
 
 // Function to generate XPath for an element
@@ -60,45 +82,95 @@ function generateXPath(element: Element): string {
     return '/html/body';
   }
   
-  let xpath = '';
-  let parent = element.parentElement;
+  // Generate a full XPath that doesn't rely on IDs
+  const generateFullXPath = (el: Element): string => {
+    if (!el || el === document.documentElement) {
+      return '/html';
+    }
+    
+    if (el === document.body) {
+      return '/html/body';
+    }
+    
+    let parent = el.parentElement;
+    if (!parent) {
+      return `/${el.tagName.toLowerCase()}`;
+    }
+    
+    // Get the tag name
+    let tagName = el.tagName.toLowerCase();
+    
+    // Count siblings with same tag name
+    let siblings = Array.from(parent.children).filter(
+      sibling => sibling.tagName.toLowerCase() === tagName
+    );
+    
+    let position = 1;
+    if (siblings.length > 1) {
+      position = Array.from(siblings).indexOf(el) + 1;
+    }
+    
+    // Build the path segment
+    let pathSegment = `/${tagName}[${position}]`;
+    
+    // Recursively build the full path
+    return generateFullXPath(parent) + pathSegment;
+  };
   
-  if (!parent) {
-    return `/${element.tagName.toLowerCase()}`;
+  // Generate a more specific XPath using attributes if available
+  const generateSpecificXPath = (el: Element): string | null => {
+    // Skip if element has a long or complex ID
+    const id = el.id;
+    if (id && id.length < 20 && !/[^\w-]/.test(id)) {
+      return `//${el.tagName.toLowerCase()}[@id="${id}"]`;
+    }
+    
+    // Try with a simple class if available
+    const simpleClass = Array.from(el.classList).find(cls => 
+      cls.length < 20 && !/[^\w-]/.test(cls) && 
+      document.querySelectorAll(`.${cls}`).length < 5
+    );
+    
+    if (simpleClass) {
+      return `//${el.tagName.toLowerCase()}[contains(@class, "${simpleClass}")]`;
+    }
+    
+    return null;
+  };
+  
+  // Try to get a specific XPath first, fall back to full XPath
+  const specificXPath = generateSpecificXPath(element);
+  if (specificXPath) {
+    return specificXPath;
   }
   
-  // Get the tag name
-  let tagName = element.tagName.toLowerCase();
-  
-  // Check if this element has an ID
-  if (element.id) {
-    return `//${tagName}[@id="${element.id}"]`;
-  }
-  
-  // Count siblings with same tag name
-  let siblings = Array.from(parent.children).filter(
-    sibling => sibling.tagName.toLowerCase() === tagName
-  );
-  
-  if (siblings.length > 1) {
-    // If there are multiple siblings with the same tag, use position
-    let position = siblings.indexOf(element as Element) + 1;
-    xpath = `/${tagName}[${position}]`;
-  } else {
-    // If this is the only sibling with this tag name
-    xpath = `/${tagName}`;
-  }
-  
-  // Recursively build the path
-  if (parent !== document.body) {
-    return generateXPath(parent) + xpath;
-  } else {
-    return '/html/body' + xpath;
-  }
+  return generateFullXPath(element);
 }
 
 // Function to get element information
 function getElementInfo(element: Element): any {
+  // Generate a full XPath (absolute path from html)
+  const generateFullXPath = (el: Element): string => {
+    if (!el) return '';
+    if (el === document.documentElement) return '/html';
+    if (el === document.body) return '/html/body';
+    
+    const parent = el.parentElement;
+    if (!parent) return `/${el.tagName.toLowerCase()}`;
+    
+    const tagName = el.tagName.toLowerCase();
+    const siblings = Array.from(parent.children).filter(
+      sibling => sibling.tagName.toLowerCase() === tagName
+    );
+    
+    const position = siblings.length > 1 ? 
+      Array.from(siblings).indexOf(el) + 1 : 1;
+    
+    return `${generateFullXPath(parent)}/${tagName}[${position}]`;
+  };
+  
+  const fullXPath = generateFullXPath(element);
+  
   return {
     tagName: element.tagName.toLowerCase(),
     id: element.id || null,
@@ -110,15 +182,38 @@ function getElementInfo(element: Element): any {
     })),
     cssSelector: generateCssSelector(element),
     xpath: generateXPath(element),
+    fullXPath: fullXPath,
     html: element.outerHTML.substring(0, 500)
   };
 }
 
 // Function to get basic element information for live preview
 function getLivePreviewInfo(element: Element): any {
+  // Generate a full XPath (absolute path from html)
+  const generateFullXPath = (el: Element): string => {
+    if (!el) return '';
+    if (el === document.documentElement) return '/html';
+    if (el === document.body) return '/html/body';
+    
+    const parent = el.parentElement;
+    if (!parent) return `/${el.tagName.toLowerCase()}`;
+    
+    const tagName = el.tagName.toLowerCase();
+    const siblings = Array.from(parent.children).filter(
+      sibling => sibling.tagName.toLowerCase() === tagName
+    );
+    
+    const position = siblings.length > 1 ? 
+      Array.from(siblings).indexOf(el) + 1 : 1;
+    
+    return `${generateFullXPath(parent)}/${tagName}[${position}]`;
+  };
+  
   return {
     tagName: element.tagName.toLowerCase(),
-    text: element.textContent || null
+    text: element.textContent || null,
+    xpath: generateXPath(element),
+    fullXPath: generateFullXPath(element)
   };
 }
 

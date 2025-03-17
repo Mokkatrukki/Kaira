@@ -7,12 +7,14 @@ export interface KeyValueItem {
   value: string;
   xpath?: string;
   cssSelector?: string;
+  fullXPath?: string;
 }
 
 // Interface for element information
 export interface ElementInfo {
   text: string | null;
   xpath: string;
+  fullXPath: string;
   tagName: string;
   id: string | null;
   classes: string[];
@@ -26,6 +28,7 @@ export interface LivePreviewInfo {
   tagName: string;
   text: string;
   xpath: string;
+  fullXPath?: string;
 }
 
 // Interface for a collected item
@@ -58,7 +61,7 @@ interface JsonBuilderStore {
   updateItemKey: (id: string, key: string) => void;
   startSelection: (itemId: string) => boolean;
   setScrollingMode: (isActive: boolean) => void;
-  addSelectedValue: (value: string, xpath?: string, cssSelector?: string) => void;
+  addSelectedValue: (value: string, xpath?: string, cssSelector?: string, fullXPath?: string) => void;
   resetSelection: () => void;
   clear: () => void;
   
@@ -160,7 +163,7 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     set({ isScrollingMode: isActive });
   },
   
-  addSelectedValue: (value: string, xpath?: string, cssSelector?: string) => {
+  addSelectedValue: (value: string, xpath?: string, cssSelector?: string, fullXPath?: string) => {
     const { currentItemId, items, data } = get();
     
     if (!currentItemId) return;
@@ -168,9 +171,9 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const item = items.find((item: KeyValueItem) => item.id === currentItemId);
     if (!item) return;
     
-    // Update the item value, xpath, cssSelector and data
+    // Update the item value, xpath, cssSelector, fullXPath and data
     const newItems = items.map((i: KeyValueItem) => 
-      i.id === currentItemId ? { ...i, value, xpath, cssSelector } : i
+      i.id === currentItemId ? { ...i, value, xpath, cssSelector, fullXPath } : i
     );
     
     const newData = { ...data };
@@ -210,12 +213,13 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const { items, collection } = get();
     
     // Create selectors object for finding elements
-    const selectors: Record<string, { xpath?: string; cssSelector?: string }> = {};
+    const selectors: Record<string, { xpath?: string; cssSelector?: string; fullXPath?: string }> = {};
     items.forEach(item => {
-      if (item.key && (item.xpath || item.cssSelector)) {
+      if (item.key && (item.xpath || item.cssSelector || item.fullXPath)) {
         selectors[item.key] = {
           xpath: item.xpath,
-          cssSelector: item.cssSelector
+          cssSelector: item.cssSelector,
+          fullXPath: item.fullXPath
         };
       }
     });
@@ -245,7 +249,27 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
           
           // Process each selector type
           for (const [key, selectorObj] of Object.entries(selectors)) {
-            // Try XPath first
+            // Try fullXPath first (most reliable across pages)
+            if (selectorObj.fullXPath) {
+              try {
+                const fullXPathResult = document.evaluate(
+                  selectorObj.fullXPath,
+                  document,
+                  null,
+                  XPathResult.FIRST_ORDERED_NODE_TYPE,
+                  null
+                ).singleNodeValue;
+                
+                if (fullXPathResult) {
+                  results[key] = fullXPathResult.textContent?.trim() || '';
+                  continue; // Skip other selectors if fullXPath found the element
+                }
+              } catch (error) {
+                console.error(`Error with fullXPath for ${key}:`, error);
+              }
+            }
+            
+            // Try XPath next
             if (selectorObj.xpath) {
               try {
                 const xpathResult = document.evaluate(

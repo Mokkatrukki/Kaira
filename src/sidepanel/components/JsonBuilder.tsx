@@ -31,12 +31,13 @@ const JsonBuilder: React.FC = () => {
     setJsonOutput(JSON.stringify(data, null, 2));
     
     // Generate selectors JSON
-    const selectorsData: Record<string, { xpath?: string; cssSelector?: string }> = {};
+    const selectorsData: Record<string, { xpath?: string; cssSelector?: string; fullXPath?: string }> = {};
     items.forEach(item => {
       if (item.key) {
         selectorsData[item.key] = {
           xpath: item.xpath || '',
-          cssSelector: item.cssSelector || ''
+          cssSelector: item.cssSelector || '',
+          fullXPath: item.fullXPath || ''
         };
       }
     });

@@ -52,11 +52,12 @@ export function setupElementSelectionListeners(): void {
     switch (message.action) {
       case 'elementSelected':
         if (jsonStore.isSelectionActive && message.data) {
-          // Add the selected value with xpath and cssSelector
+          // Add the selected value with xpath, cssSelector, and fullXPath
           jsonStore.addSelectedValue(
             message.data.text || '',
             message.data.xpath,
-            message.data.cssSelector
+            message.data.cssSelector,
+            message.data.fullXPath
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
@@ -75,7 +76,8 @@ export function setupElementSelectionListeners(): void {
           const previewInfo: LivePreviewInfo = {
             tagName: message.data.tagName,
             text: message.data.text || '',
-            xpath: message.data.xpath
+            xpath: message.data.xpath,
+            fullXPath: message.data.fullXPath
           };
           uiStore.setLivePreviewInfo(previewInfo);
           uiStore.setShowLivePreview(true);
