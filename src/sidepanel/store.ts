@@ -268,81 +268,31 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
   },
   
   addSelectedRootValue: (fullXPath: string) => {
-    const { currentItemId, items } = get();
+    const { currentItemId, items, data } = get();
     
-    console.log('Adding root XPath:', fullXPath, 'for currentItemId:', currentItemId);
-    
-    if (!currentItemId) {
-      console.error('No currentItemId set for root selection');
-      return;
-    }
+    if (!currentItemId) return;
     
     const item = items.find((item: KeyValueItem) => item.id === currentItemId);
-    if (!item) {
-      console.error('Item not found for currentItemId:', currentItemId);
-      return;
-    }
-    
-    console.log('Found item for root selection:', item);
+    if (!item || !item.isList) return;
     
     // Update the item with the root XPath
-    const newItems = items.map((i: KeyValueItem) => 
-      i.id === currentItemId ? { 
-        ...i, 
-        rootFullXPath: fullXPath
-      } : i
+    const updatedItems = items.map((i: KeyValueItem) => 
+      i.id === currentItemId ? { ...i, rootFullXPath: fullXPath, value: '[]' } : i
     );
     
-    console.log('Updated items with root XPath:', newItems.find(i => i.id === currentItemId));
+    // Update the data object with an empty array for this list
+    const newData = { ...data };
+    if (item.key) {
+      newData[item.key] = [];
+    }
     
     set({
-      items: newItems,
+      items: updatedItems,
+      data: newData,
       isRootSelectionActive: false,
-      isItemSelectionActive: true, // Automatically move to item selection
+      currentItemId: null,
       isScrollingMode: false
     });
-    
-    // Apply subtle highlight to the root element when moving to item selection
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id! },
-          func: (rootXPath) => {
-            try {
-              // Find the root element
-              const rootElement = document.evaluate(
-                rootXPath as string,
-                document,
-                null,
-                XPathResult.FIRST_ORDERED_NODE_TYPE,
-                null
-              ).singleNodeValue as HTMLElement;
-              
-              if (!rootElement) return;
-              
-              // Store original styles
-              const originalOutline = rootElement.style.outline;
-              const originalOutlineOffset = rootElement.style.outlineOffset;
-              
-              // Apply subtle highlight to the root element
-              rootElement.style.outline = "1px dashed rgba(74, 144, 226, 0.5)";
-              rootElement.style.outlineOffset = "2px";
-              
-              // Store the original styles in a data attribute for later restoration
-              rootElement.dataset.originalOutline = originalOutline;
-              rootElement.dataset.originalOutlineOffset = originalOutlineOffset;
-            } catch (error) {
-              console.error('Error highlighting root element:', error);
-            }
-          },
-          args: [fullXPath]
-        });
-      } catch (error) {
-        console.error('Error executing script for root highlight:', error);
-      }
-    });
-    
-    console.log('State updated for root selection, moving to item selection');
   },
   
   addSelectedItemValue: (value: string, fullXPath: string) => {
@@ -540,11 +490,10 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
   resetSelection: () => {
     set({
       isSelectionActive: false,
-      isScrollingMode: false,
-      currentItemId: null,
-      isListMode: false,
       isRootSelectionActive: false,
-      isItemSelectionActive: false
+      isItemSelectionActive: false,
+      currentItemId: null,
+      isScrollingMode: false
     });
   },
   
@@ -567,26 +516,35 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     
     // Create selectors object for finding elements
     const selectors: Record<string, { 
+      type: string;
       xpath?: string; 
       cssSelector?: string; 
       fullXPath?: string;
-      isList?: boolean;
-      rootFullXPath?: string;
+      rootElement?: {
+        fullXPath: string;
+        xpath?: string;
+        cssSelector?: string;
+      };
       relativeXPath?: string;
     }> = {};
     
     items.forEach(item => {
       if (item.key) {
-        if (item.isList && item.rootFullXPath && item.relativeXPath) {
-          // For list items, include the root XPath and relative XPath
+        if (item.isList && item.rootFullXPath) {
+          // For list items, include root element information
           selectors[item.key] = {
-            isList: true,
-            rootFullXPath: item.rootFullXPath,
+            type: 'list',
+            rootElement: {
+              fullXPath: item.rootFullXPath,
+              xpath: item.xpath || '',
+              cssSelector: item.cssSelector || ''
+            },
             relativeXPath: item.relativeXPath
           };
         } else if (item.xpath || item.cssSelector || item.fullXPath) {
           // For regular items, include the standard selectors
           selectors[item.key] = {
+            type: 'single',
             xpath: item.xpath,
             cssSelector: item.cssSelector,
             fullXPath: item.fullXPath
@@ -621,11 +579,11 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
           // Process each selector type
           for (const [key, selectorObj] of Object.entries(selectors)) {
             // Handle list items
-            if (selectorObj.isList && selectorObj.rootFullXPath && selectorObj.relativeXPath) {
+            if (selectorObj.type === 'list' && selectorObj.rootElement?.fullXPath && selectorObj.relativeXPath) {
               try {
                 // First, find the root element
                 const rootElement = document.evaluate(
-                  selectorObj.rootFullXPath,
+                  selectorObj.rootElement.fullXPath,
                   document,
                   null,
                   XPathResult.FIRST_ORDERED_NODE_TYPE,
@@ -763,55 +721,58 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
               }
             }
             
-            // Try fullXPath first (most reliable across pages)
-            if (selectorObj.fullXPath) {
-              try {
-                const fullXPathResult = document.evaluate(
-                  selectorObj.fullXPath,
-                  document,
-                  null,
-                  XPathResult.FIRST_ORDERED_NODE_TYPE,
-                  null
-                ).singleNodeValue;
-                
-                if (fullXPathResult) {
-                  results[key] = fullXPathResult.textContent?.trim() || '';
-                  continue; // Skip other selectors if fullXPath found the element
+            // Handle single items
+            if (selectorObj.type === 'single') {
+              // Try fullXPath first (most reliable across pages)
+              if (selectorObj.fullXPath) {
+                try {
+                  const fullXPathResult = document.evaluate(
+                    selectorObj.fullXPath,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                  ).singleNodeValue;
+                  
+                  if (fullXPathResult) {
+                    results[key] = fullXPathResult.textContent?.trim() || '';
+                    continue; // Skip other selectors if fullXPath found the element
+                  }
+                } catch (error) {
+                  console.error(`Error with fullXPath for ${key}:`, error);
                 }
-              } catch (error) {
-                console.error(`Error with fullXPath for ${key}:`, error);
               }
-            }
-            
-            // Try XPath next
-            if (selectorObj.xpath) {
-              try {
-                const xpathResult = document.evaluate(
-                  selectorObj.xpath,
-                  document,
-                  null,
-                  XPathResult.FIRST_ORDERED_NODE_TYPE,
-                  null
-                ).singleNodeValue;
-                
-                if (xpathResult) {
-                  results[key] = xpathResult.textContent?.trim() || '';
-                  continue; // Skip CSS selector if XPath found the element
+              
+              // Try XPath next
+              if (selectorObj.xpath) {
+                try {
+                  const xpathResult = document.evaluate(
+                    selectorObj.xpath,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                  ).singleNodeValue;
+                  
+                  if (xpathResult) {
+                    results[key] = xpathResult.textContent?.trim() || '';
+                    continue; // Skip CSS selector if XPath found the element
+                  }
+                } catch (error) {
+                  console.error(`Error with XPath for ${key}:`, error);
                 }
-              } catch (error) {
-                console.error(`Error with XPath for ${key}:`, error);
               }
-            }
-            
-            // Try CSS selector if XPath didn't work
-            if (selectorObj.cssSelector) {
-              try {
-                const cssResult = document.querySelector(selectorObj.cssSelector);
-                if (cssResult) {
-                  results[key] = cssResult.textContent?.trim() || '';
+              
+              // Try CSS selector if XPath didn't work
+              if (selectorObj.cssSelector) {
+                try {
+                  const cssResult = document.querySelector(selectorObj.cssSelector);
+                  if (cssResult) {
+                    results[key] = cssResult.textContent?.trim() || '';
+                  }
+                } catch (error) {
+                  console.error(`Error with CSS selector for ${key}:`, error);
                 }
-              } catch (error) {
-                console.error(`Error with CSS selector for ${key}:`, error);
               }
             }
           }

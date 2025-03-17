@@ -61,18 +61,25 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
+        } else if (jsonStore.isRootSelectionActive && message.data) {
+          // Add the selected root element for a list
+          jsonStore.addSelectedRootValue(
+            message.data.fullXPath
+          );
+          // Clear the live preview
+          uiStore.setLivePreviewInfo(null);
         }
         break;
         
       case 'scrollingModeActive':
-        if (jsonStore.isSelectionActive) {
+        if (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive) {
           jsonStore.setScrollingMode(message.data);
         }
         break;
         
       case 'elementHighlighted':
         // Update the live preview
-        if (message.data && jsonStore.isSelectionActive) {
+        if (message.data && (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive)) {
           const previewInfo: LivePreviewInfo = {
             tagName: message.data.tagName,
             text: message.data.text || '',

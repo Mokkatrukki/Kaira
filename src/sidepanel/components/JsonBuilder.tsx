@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import KeyValueItem from './KeyValueItem';
+import ListItem from './ListItem';
 import LivePreview from './LivePreview';
 import { useStore, useJsonBuilderStore, KeyValueItem as KeyValueItemType } from '../store';
 import { stopElementSelection } from '../elementSelection';
@@ -10,10 +11,13 @@ const JsonBuilder: React.FC = () => {
     items, 
     data, 
     addItem, 
+    addListItem,
     removeItem, 
     updateItemKey, 
     startSelection,
+    startRootSelection,
     isSelectionActive,
+    isRootSelectionActive,
     resetSelection,
     addSelectedValue,
     collection,
@@ -31,14 +35,28 @@ const JsonBuilder: React.FC = () => {
     setJsonOutput(JSON.stringify(data, null, 2));
     
     // Generate selectors JSON
-    const selectorsData: Record<string, { xpath?: string; cssSelector?: string; fullXPath?: string }> = {};
+    const selectorsData: Record<string, any> = {};
     items.forEach(item => {
       if (item.key) {
-        selectorsData[item.key] = {
-          xpath: item.xpath || '',
-          cssSelector: item.cssSelector || '',
-          fullXPath: item.fullXPath || ''
-        };
+        if (item.isList && item.rootFullXPath) {
+          // For list items, include root element information
+          selectorsData[item.key] = {
+            type: 'list',
+            rootElement: {
+              fullXPath: item.rootFullXPath,
+              xpath: item.xpath || '',
+              cssSelector: item.cssSelector || ''
+            }
+          };
+        } else {
+          // For regular key-value items
+          selectorsData[item.key] = {
+            type: 'single',
+            xpath: item.xpath || '',
+            cssSelector: item.cssSelector || '',
+            fullXPath: item.fullXPath || ''
+          };
+        }
       }
     });
     setSelectorsOutput(JSON.stringify(selectorsData, null, 2));
@@ -52,7 +70,7 @@ const JsonBuilder: React.FC = () => {
   // Add escape key listener to cancel selection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isSelectionActive) {
+      if (e.key === 'Escape' && (isSelectionActive || isRootSelectionActive)) {
         stopElementSelection();
       }
     };
@@ -61,10 +79,14 @@ const JsonBuilder: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSelectionActive]);
+  }, [isSelectionActive, isRootSelectionActive]);
 
   const handleAddKeyValuePair = () => {
     addItem();
+  };
+
+  const handleAddListItem = () => {
+    addListItem();
   };
 
   const handleUpdateKey = (id: string, newKey: string) => {
@@ -73,6 +95,10 @@ const JsonBuilder: React.FC = () => {
 
   const handleStartValueSelection = (id: string) => {
     startSelection(id);
+  };
+
+  const handleStartRootSelection = (id: string) => {
+    startRootSelection(id);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -114,21 +140,28 @@ const JsonBuilder: React.FC = () => {
           <button 
             className="add-button" 
             onClick={handleAddKeyValuePair} 
-            disabled={isSelectionActive}
+            disabled={isSelectionActive || isRootSelectionActive}
           >
             Add Key-Value Pair
           </button>
           <button 
+            className="add-list-button" 
+            onClick={handleAddListItem} 
+            disabled={isSelectionActive || isRootSelectionActive}
+          >
+            Add List Item
+          </button>
+          <button 
             className="collect-button" 
             onClick={handleCollectItems} 
-            disabled={isSelectionActive || isCollecting}
+            disabled={isSelectionActive || isRootSelectionActive || isCollecting}
           >
             {isCollecting ? 'Collecting...' : 'Collect Items'}
           </button>
         </div>
       </div>
 
-      {isSelectionActive && (
+      {(isSelectionActive || isRootSelectionActive) && (
         <div className="selection-active-notice">
           <p>Selection mode active. Click on an element in the page or press ESC to cancel.</p>
           <button onClick={() => stopElementSelection()}>Cancel Selection</button>
@@ -137,14 +170,25 @@ const JsonBuilder: React.FC = () => {
 
       <div className="key-value-list">
         {items.map((pair: KeyValueItemType) => (
-          <KeyValueItem
-            key={pair.id}
-            item={pair}
-            onUpdateKey={handleUpdateKey}
-            onStartSelection={handleStartValueSelection}
-            onRemove={removeItem}
-            disabled={isSelectionActive}
-          />
+          pair.isList ? (
+            <ListItem
+              key={pair.id}
+              item={pair}
+              onUpdateKey={handleUpdateKey}
+              onStartRootSelection={handleStartRootSelection}
+              onRemove={removeItem}
+              disabled={isSelectionActive || isRootSelectionActive}
+            />
+          ) : (
+            <KeyValueItem
+              key={pair.id}
+              item={pair}
+              onUpdateKey={handleUpdateKey}
+              onStartSelection={handleStartValueSelection}
+              onRemove={removeItem}
+              disabled={isSelectionActive || isRootSelectionActive}
+            />
+          )
         ))}
       </div>
 
@@ -154,7 +198,7 @@ const JsonBuilder: React.FC = () => {
         <button 
           className="copy-button" 
           onClick={() => copyToClipboard(jsonOutput, 'Values JSON')} 
-          disabled={isSelectionActive}
+          disabled={isSelectionActive || isRootSelectionActive}
         >
           Copy Values JSON
         </button>
@@ -166,7 +210,7 @@ const JsonBuilder: React.FC = () => {
         <button 
           className="copy-button" 
           onClick={() => copyToClipboard(selectorsOutput, 'Selectors JSON')} 
-          disabled={isSelectionActive}
+          disabled={isSelectionActive || isRootSelectionActive}
         >
           Copy Selectors JSON
         </button>
@@ -179,7 +223,7 @@ const JsonBuilder: React.FC = () => {
             <button 
               className="clear-button" 
               onClick={handleClearCollection} 
-              disabled={isSelectionActive}
+              disabled={isSelectionActive || isRootSelectionActive}
             >
               Clear Collection
             </button>
@@ -190,14 +234,14 @@ const JsonBuilder: React.FC = () => {
           <button 
             className="copy-button" 
             onClick={() => copyToClipboard(collectionOutput, 'Collection JSON')} 
-            disabled={isSelectionActive}
+            disabled={isSelectionActive || isRootSelectionActive}
           >
             Copy Collection JSON
           </button>
         )}
       </div>
 
-      {showLivePreview && livePreviewInfo && isSelectionActive && (
+      {showLivePreview && livePreviewInfo && (isSelectionActive || isRootSelectionActive) && (
         <LivePreview info={livePreviewInfo} visible={true} />
       )}
     </div>

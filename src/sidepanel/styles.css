@@ -377,4 +377,62 @@
 .clear-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+/* List Item Styles */
+.list-item {
+  background-color: #f9f9ff;
+  border: 1px solid #e0e0ff;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.list-item-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.list-value-display {
+  flex: 1;
+  padding: 0.5rem;
+  background-color: #f0f0ff;
+  border: 1px solid #e0e0ff;
+  border-radius: 4px;
+  min-height: 1.5rem;
+  font-size: 0.9rem;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.add-list-button {
+  background-color: #6a5acd;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.add-list-button:hover {
+  background-color: #5a4abf;
+}
+
+.add-list-button:disabled {
+  background-color: #d0d0d0;
+  cursor: not-allowed;
 } 
