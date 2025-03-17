@@ -435,4 +435,26 @@
 .add-list-button:disabled {
   background-color: #d0d0d0;
   cursor: not-allowed;
+}
+
+/* Clear Highlight Button */
+.clear-highlight-button {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-right: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.clear-highlight-button:hover {
+  background-color: #f57c00;
+}
+
+.clear-highlight-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 } 

@@ -127,6 +127,52 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const { items, data } = get();
     const item = items.find((item: KeyValueItem) => item.id === id);
     
+    if (!item) return;
+    
+    // If it's a list item with a root element, clear the highlight
+    if (item.isList && item.rootFullXPath) {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id! },
+            func: (rootXPath) => {
+              try {
+                // Find the root element
+                const rootElement = document.evaluate(
+                  rootXPath as string,
+                  document,
+                  null,
+                  XPathResult.FIRST_ORDERED_NODE_TYPE,
+                  null
+                ).singleNodeValue as HTMLElement;
+                
+                if (!rootElement) return;
+                
+                // Restore original styles if they were saved
+                if (rootElement.dataset.kairaOriginalOutline !== undefined) {
+                  rootElement.style.outline = rootElement.dataset.kairaOriginalOutline;
+                  delete rootElement.dataset.kairaOriginalOutline;
+                }
+                
+                if (rootElement.dataset.kairaOriginalOutlineOffset !== undefined) {
+                  rootElement.style.outlineOffset = rootElement.dataset.kairaOriginalOutlineOffset;
+                  delete rootElement.dataset.kairaOriginalOutlineOffset;
+                }
+                
+                delete rootElement.dataset.kairarootElement;
+                rootElement.title = '';
+              } catch (error) {
+                console.error('Error removing highlight from root element:', error);
+              }
+            },
+            args: [item.rootFullXPath]
+          });
+        } catch (error) {
+          console.error('Error executing script for removing highlight:', error);
+        }
+      });
+    }
+    
     if (item && item.key) {
       const newData = { ...data };
       delete newData[item.key];
@@ -292,6 +338,50 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
       isRootSelectionActive: false,
       currentItemId: null,
       isScrollingMode: false
+    });
+    
+    // Apply persistent highlight to the root element
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id! },
+          func: (rootXPath) => {
+            try {
+              // Find the root element
+              const rootElement = document.evaluate(
+                rootXPath as string,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+              ).singleNodeValue as HTMLElement;
+              
+              if (!rootElement) return;
+              
+              // Store original styles
+              const originalOutline = rootElement.style.outline;
+              const originalOutlineOffset = rootElement.style.outlineOffset;
+              
+              // Apply subtle highlight to the root element
+              rootElement.style.outline = "2px dashed rgba(106, 90, 205, 0.7)"; // Slateblue with transparency
+              rootElement.style.outlineOffset = "2px";
+              
+              // Store the original styles in a data attribute for later restoration
+              rootElement.dataset.kairarootElement = "true";
+              rootElement.dataset.kairaOriginalOutline = originalOutline;
+              rootElement.dataset.kairaOriginalOutlineOffset = originalOutlineOffset;
+              
+              // Add a tooltip to show this is a selected root element
+              rootElement.title = "Kaira: Selected List Root Element";
+            } catch (error) {
+              console.error('Error highlighting root element:', error);
+            }
+          },
+          args: [fullXPath]
+        });
+      } catch (error) {
+        console.error('Error executing script for root highlight:', error);
+      }
     });
   },
   
@@ -498,6 +588,54 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
   },
   
   clear: () => {
+    const { items } = get();
+    
+    // Clear all highlights from list root elements
+    items.forEach(item => {
+      if (item.isList && item.rootFullXPath) {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: tabs[0].id! },
+              func: (rootXPath) => {
+                try {
+                  // Find the root element
+                  const rootElement = document.evaluate(
+                    rootXPath as string,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                  ).singleNodeValue as HTMLElement;
+                  
+                  if (!rootElement) return;
+                  
+                  // Restore original styles if they were saved
+                  if (rootElement.dataset.kairaOriginalOutline !== undefined) {
+                    rootElement.style.outline = rootElement.dataset.kairaOriginalOutline;
+                    delete rootElement.dataset.kairaOriginalOutline;
+                  }
+                  
+                  if (rootElement.dataset.kairaOriginalOutlineOffset !== undefined) {
+                    rootElement.style.outlineOffset = rootElement.dataset.kairaOriginalOutlineOffset;
+                    delete rootElement.dataset.kairaOriginalOutlineOffset;
+                  }
+                  
+                  delete rootElement.dataset.kairarootElement;
+                  rootElement.title = '';
+                } catch (error) {
+                  console.error('Error removing highlight from root element:', error);
+                }
+              },
+              args: [item.rootFullXPath]
+            });
+          } catch (error) {
+            console.error('Error executing script for removing highlight:', error);
+          }
+        });
+      }
+    });
+    
     set({
       data: {},
       items: [],

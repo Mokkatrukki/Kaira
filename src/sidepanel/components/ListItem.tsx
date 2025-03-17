@@ -55,6 +55,52 @@ const ListItem: React.FC<ListItemProps> = ({
     onRemove(item.id);
   };
   
+  const handleClearHighlight = () => {
+    if (!item.rootFullXPath) return;
+    
+    // Clear the highlight from the root element
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id! },
+          func: (rootXPath) => {
+            try {
+              // Find the root element
+              const rootElement = document.evaluate(
+                rootXPath as string,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+              ).singleNodeValue as HTMLElement;
+              
+              if (!rootElement) return;
+              
+              // Restore original styles if they were saved
+              if (rootElement.dataset.kairaOriginalOutline !== undefined) {
+                rootElement.style.outline = rootElement.dataset.kairaOriginalOutline;
+                delete rootElement.dataset.kairaOriginalOutline;
+              }
+              
+              if (rootElement.dataset.kairaOriginalOutlineOffset !== undefined) {
+                rootElement.style.outlineOffset = rootElement.dataset.kairaOriginalOutlineOffset;
+                delete rootElement.dataset.kairaOriginalOutlineOffset;
+              }
+              
+              delete rootElement.dataset.kairarootElement;
+              rootElement.title = '';
+            } catch (error) {
+              console.error('Error removing highlight from root element:', error);
+            }
+          },
+          args: [item.rootFullXPath]
+        });
+      } catch (error) {
+        console.error('Error executing script for removing highlight:', error);
+      }
+    });
+  };
+  
   return (
     <div className="list-item">
       <div className="list-item-header">
@@ -68,7 +114,9 @@ const ListItem: React.FC<ListItemProps> = ({
           disabled={disabled || isSelecting}
         />
         <div className="list-value-display">
-          {item.rootFullXPath ? 'List root selected' : 'Click "Select Root" to choose a list container'}
+          {item.rootFullXPath 
+            ? 'List root element selected and highlighted' 
+            : 'Click "Select Root" to choose a list container'}
         </div>
       </div>
       
@@ -80,6 +128,15 @@ const ListItem: React.FC<ListItemProps> = ({
         >
           {isSelecting ? 'Selecting...' : 'Select Root'}
         </button>
+        {item.rootFullXPath && (
+          <button
+            className="clear-highlight-button"
+            onClick={handleClearHighlight}
+            disabled={disabled || isSelecting}
+          >
+            Clear Highlight
+          </button>
+        )}
         <button
           className="remove-button"
           onClick={handleRemoveClick}
