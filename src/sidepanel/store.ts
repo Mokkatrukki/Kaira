@@ -393,187 +393,81 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     const item = items.find((item: KeyValueItem) => item.id === currentItemId);
     if (!item || !item.rootFullXPath) return;
     
-    // Extract the relative XPath by removing the root XPath from the full XPath
-    let relativeXPath = fullXPath.replace(item.rootFullXPath, '');
+    // Get the current list items or initialize an empty array
+    const currentListItems = Array.isArray(item.listItems) ? [...item.listItems] : [];
     
-    // Make the relative XPath more generic by removing index selectors [n]
-    // This will match all similar elements, not just the specific one selected
-    relativeXPath = relativeXPath.replace(/\[\d+\]/g, '');
+    // Add the new value to the list
+    currentListItems.push(value);
     
-    console.log('Original relative XPath:', fullXPath.replace(item.rootFullXPath, ''));
-    console.log('Generic relative XPath:', relativeXPath);
-    
-    // Preview all matching items to show what will be collected
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id! },
-          func: (rootXPath, relXPath) => {
-            // Find the root element
-            const rootElement = document.evaluate(
-              rootXPath as string,
-              document,
-              null,
-              XPathResult.FIRST_ORDERED_NODE_TYPE,
-              null
-            ).singleNodeValue as HTMLElement;
-            
-            if (!rootElement) return { items: [], total: 0, allItems: [] };
-            
-            // Remove the subtle highlight from the root element
-            if (rootElement.dataset.originalOutline !== undefined) {
-              rootElement.style.outline = rootElement.dataset.originalOutline;
-              delete rootElement.dataset.originalOutline;
-            }
-            
-            if (rootElement.dataset.originalOutlineOffset !== undefined) {
-              rootElement.style.outlineOffset = rootElement.dataset.originalOutlineOffset;
-              delete rootElement.dataset.originalOutlineOffset;
-            }
-            
-            // Create XPath for evaluation with wildcards
-            const xpathForEvaluation = `.${(relXPath as string).replace(/\/([^\/]+)(?!\[)/g, '/$1[*]')}`;
-            
-            try {
-              // Find all matching elements
-              const xpathResult = document.evaluate(
-                xpathForEvaluation,
-                rootElement,
-                null,
-                XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                null
-              );
-              
-              console.log(`Found ${xpathResult.snapshotLength} matching elements`);
-              
-              // Extract preview of all items (limit to first 10 for performance)
-              const previewItems = [];
-              const maxPreview = Math.min(xpathResult.snapshotLength, 10);
-              
-              // Store elements to highlight
-              const elementsToHighlight = [];
-              
-              for (let i = 0; i < xpathResult.snapshotLength; i++) {
-                const node = xpathResult.snapshotItem(i);
-                if (node) {
-                  if (i < maxPreview) {
-                    previewItems.push(node.textContent?.trim() || '');
-                  }
-                  elementsToHighlight.push(node);
-                }
-              }
-              
-              // Highlight all found elements temporarily
-              try {
-                elementsToHighlight.forEach((element) => {
-                  try {
-                    const el = element as HTMLElement;
-                    // Store original styles
-                    const originalBackground = el.style.backgroundColor;
-                    const originalColor = el.style.color;
-                    const originalOutline = el.style.outline;
-                    
-                    // Apply highlight
-                    el.style.backgroundColor = "yellow";
-                    el.style.color = "black";
-                    el.style.outline = "2px solid red";
-                    
-                    // Reset after 3 seconds
-                    setTimeout(() => {
-                      try {
-                        el.style.backgroundColor = originalBackground;
-                        el.style.color = originalColor;
-                        el.style.outline = originalOutline;
-                      } catch (e) {
-                        // Element might no longer be in the DOM, ignore
-                      }
-                    }, 3000);
-                  } catch (elementError) {
-                    console.error('Error highlighting individual element:', elementError);
-                  }
-                });
-              } catch (highlightError) {
-                console.error('Error highlighting elements:', highlightError);
-              }
-              
-              // Add count if there are more items
-              if (xpathResult.snapshotLength > 10) {
-                previewItems.push(`... and ${xpathResult.snapshotLength - 10} more items`);
-              }
-              
-              // Try to send message to background, but don't fail if it errors
-              try {
-                if (chrome.runtime && chrome.runtime.sendMessage) {
-                  chrome.runtime.sendMessage({
-                    action: 'scrollingModeActive',
-                    data: false
-                  }).catch(() => {
-                    // Ignore errors with message sending
-                    console.log('Note: Error sending message to background, but continuing anyway');
-                  });
-                }
-              } catch (msgError) {
-                // Ignore messaging errors
-                console.log('Note: Error with chrome messaging, but continuing anyway');
-              }
-              
-              return {
-                items: previewItems,
-                total: xpathResult.snapshotLength,
-                allItems: elementsToHighlight.map(el => el.textContent?.trim() || '')
-              };
-            } catch (error) {
-              console.error('Error previewing items:', error);
-              return { items: [], total: 0, allItems: [] };
-            }
-          },
-          args: [item.rootFullXPath, relativeXPath]
-        });
-        
-        const previewResult = results[0]?.result as { items: string[], total: number, allItems: string[] } | undefined;
-        if (previewResult && previewResult.total > 0) {
-          console.log(`Preview: Found ${previewResult.total} items that will be collected`);
-          console.log('Sample items:', previewResult.items);
-          
-          // Store all items in the data
-          const newData = { ...data };
-          if (item.key) {
-            newData[item.key] = previewResult.allItems;
-          }
-          
-          // Update the data state with all items
-          set({
-            data: newData
-          });
-        }
-      } catch (error) {
-        console.error('Error executing preview script:', error);
-      }
-    });
-    
-    // Update the item with the selected value, fullXPath, and relativeXPath
-    const newItems = items.map((i: KeyValueItem) => 
+    // Update the item with the new list items
+    const updatedItems = items.map((i: KeyValueItem) => 
       i.id === currentItemId ? { 
         ...i, 
-        value, 
-        fullXPath,
-        relativeXPath
+        listItems: currentListItems,
+        value: JSON.stringify(currentListItems)
       } : i
     );
     
-    // For list items, we'll initialize with the first value
-    // The complete list will be updated by the preview script above
+    // Update the data object with the list items
     const newData = { ...data };
     if (item.key) {
-      newData[item.key] = [value]; // Initialize as an array with the first value
+      newData[item.key] = currentListItems;
     }
     
     set({
-      items: newItems,
+      items: updatedItems,
       data: newData,
       isItemSelectionActive: false,
-      isScrollingMode: false,
-      currentItemId: null
+      currentItemId: null,
+      isScrollingMode: false
+    });
+    
+    // Highlight the selected item temporarily
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id! },
+          func: (itemXPath) => {
+            try {
+              // Find the selected item
+              const itemElement = document.evaluate(
+                itemXPath as string,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+              ).singleNodeValue as HTMLElement;
+              
+              if (!itemElement) return;
+              
+              // Store original styles
+              const originalBackground = itemElement.style.backgroundColor;
+              const originalColor = itemElement.style.color;
+              const originalOutline = itemElement.style.outline;
+              
+              // Apply highlight to the selected item
+              itemElement.style.backgroundColor = "rgba(142, 68, 173, 0.2)"; // Purple with transparency
+              itemElement.style.outline = "2px solid #8e44ad";
+              
+              // Reset after 1.5 seconds
+              setTimeout(() => {
+                try {
+                  itemElement.style.backgroundColor = originalBackground;
+                  itemElement.style.color = originalColor;
+                  itemElement.style.outline = originalOutline;
+                } catch (e) {
+                  // Element might no longer be in the DOM, ignore
+                }
+              }, 1500);
+            } catch (error) {
+              console.error('Error highlighting selected item:', error);
+            }
+          },
+          args: [fullXPath]
+        });
+      } catch (error) {
+        console.error('Error executing script for item highlight:', error);
+      }
     });
   },
   

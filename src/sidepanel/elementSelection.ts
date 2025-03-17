@@ -68,18 +68,26 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
+        } else if (jsonStore.isItemSelectionActive && message.data) {
+          // Add the selected item to the list
+          jsonStore.addSelectedItemValue(
+            message.data.text || '',
+            message.data.fullXPath
+          );
+          // Clear the live preview
+          uiStore.setLivePreviewInfo(null);
         }
         break;
         
       case 'scrollingModeActive':
-        if (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive) {
+        if (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive || jsonStore.isItemSelectionActive) {
           jsonStore.setScrollingMode(message.data);
         }
         break;
         
       case 'elementHighlighted':
         // Update the live preview
-        if (message.data && (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive)) {
+        if (message.data && (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive || jsonStore.isItemSelectionActive)) {
           const previewInfo: LivePreviewInfo = {
             tagName: message.data.tagName,
             text: message.data.text || '',

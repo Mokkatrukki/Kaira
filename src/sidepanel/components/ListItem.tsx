@@ -6,6 +6,7 @@ interface ListItemProps {
   item: KeyValueItemType;
   onUpdateKey: (id: string, key: string) => void;
   onStartRootSelection: (id: string) => void;
+  onStartItemSelection: (id: string) => void;
   onRemove: (id: string) => void;
   disabled: boolean;
 }
@@ -14,19 +15,21 @@ const ListItem: React.FC<ListItemProps> = ({
   item,
   onUpdateKey,
   onStartRootSelection,
+  onStartItemSelection,
   onRemove,
   disabled
 }) => {
   const [key, setKey] = useState(item.key);
   const [isSelecting, setIsSelecting] = useState(false);
   const isRootSelectionActive = useJsonBuilderStore(state => state.isRootSelectionActive);
+  const isItemSelectionActive = useJsonBuilderStore(state => state.isItemSelectionActive);
   
-  // Reset isSelecting when isRootSelectionActive becomes false (selection canceled)
+  // Reset isSelecting when selection becomes inactive
   useEffect(() => {
-    if (!isRootSelectionActive && isSelecting) {
+    if ((!isRootSelectionActive && !isItemSelectionActive) && isSelecting) {
       setIsSelecting(false);
     }
-  }, [isRootSelectionActive, isSelecting]);
+  }, [isRootSelectionActive, isItemSelectionActive, isSelecting]);
   
   const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setKey(e.target.value);
@@ -44,6 +47,21 @@ const ListItem: React.FC<ListItemProps> = ({
     
     setIsSelecting(true);
     onStartRootSelection(item.id);
+    
+    const success = await startElementSelection();
+    if (!success) {
+      setIsSelecting(false);
+    }
+  };
+  
+  const handleSelectItemClick = async () => {
+    if (!item.rootFullXPath) {
+      alert('Please select a root element first');
+      return;
+    }
+    
+    setIsSelecting(true);
+    onStartItemSelection(item.id);
     
     const success = await startElementSelection();
     if (!success) {
@@ -101,6 +119,26 @@ const ListItem: React.FC<ListItemProps> = ({
     });
   };
   
+  // Format the list items for display
+  const getListItemsDisplay = () => {
+    if (!item.rootFullXPath) {
+      return 'Click "Select Root" to choose a list container';
+    }
+    
+    if (Array.isArray(item.listItems) && item.listItems.length > 0) {
+      const displayItems = item.listItems.slice(0, 3); // Show first 3 items
+      const displayText = displayItems.map(text => `"${text}"`).join(', ');
+      
+      if (item.listItems.length > 3) {
+        return `[${displayText}, ... (${item.listItems.length - 3} more)]`;
+      }
+      
+      return `[${displayText}]`;
+    }
+    
+    return 'List root element selected. Click "Select Item" to add items.';
+  };
+  
   return (
     <div className="list-item">
       <div className="list-item-header">
@@ -114,9 +152,7 @@ const ListItem: React.FC<ListItemProps> = ({
           disabled={disabled || isSelecting}
         />
         <div className="list-value-display">
-          {item.rootFullXPath 
-            ? 'List root element selected and highlighted' 
-            : 'Click "Select Root" to choose a list container'}
+          {getListItemsDisplay()}
         </div>
       </div>
       
@@ -126,8 +162,19 @@ const ListItem: React.FC<ListItemProps> = ({
           onClick={handleSelectRootClick}
           disabled={disabled || isSelecting}
         >
-          {isSelecting ? 'Selecting...' : 'Select Root'}
+          {isSelecting && isRootSelectionActive ? 'Selecting...' : 'Select Root'}
         </button>
+        
+        {item.rootFullXPath && (
+          <button
+            className="select-item-button"
+            onClick={handleSelectItemClick}
+            disabled={disabled || isSelecting}
+          >
+            {isSelecting && isItemSelectionActive ? 'Selecting...' : 'Select Item'}
+          </button>
+        )}
+        
         {item.rootFullXPath && (
           <button
             className="clear-highlight-button"
@@ -137,6 +184,7 @@ const ListItem: React.FC<ListItemProps> = ({
             Clear Highlight
           </button>
         )}
+        
         <button
           className="remove-button"
           onClick={handleRemoveClick}

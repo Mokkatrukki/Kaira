@@ -457,4 +457,26 @@
 .clear-highlight-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+/* Select Item Button */
+.select-item-button {
+  background-color: #8e44ad;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-right: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.select-item-button:hover {
+  background-color: #7d3c98;
+}
+
+.select-item-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 } 
