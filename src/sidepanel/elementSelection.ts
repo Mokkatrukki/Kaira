@@ -2,23 +2,8 @@ import { useJsonBuilderStore, useStore, LivePreviewInfo } from './store';
 
 // Function to start element selection
 export function startElementSelection(): Promise<boolean> {
-  const store = useJsonBuilderStore.getState();
-  console.log('Starting element selection with state:', {
-    isSelectionActive: store.isSelectionActive,
-    isRootSelectionActive: store.isRootSelectionActive,
-    isItemSelectionActive: store.isItemSelectionActive,
-    currentItemId: store.currentItemId
-  });
-  
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ 
-      action: 'startElementSelection',
-      selectionState: {
-        isSelectionActive: store.isSelectionActive,
-        isRootSelectionActive: store.isRootSelectionActive,
-        isItemSelectionActive: store.isItemSelectionActive
-      }
-    }, (response) => {
+    chrome.runtime.sendMessage({ action: 'startElementSelection' }, (response) => {
       if (response?.success) {
         console.log('Element selection started');
         resolve(true);
@@ -64,18 +49,10 @@ export function setupElementSelectionListeners(): void {
     const jsonStore = useJsonBuilderStore.getState();
     const uiStore = useStore.getState();
     
-    console.log('Received message:', message.action, 'Selection states:', {
-      isSelectionActive: jsonStore.isSelectionActive,
-      isRootSelectionActive: jsonStore.isRootSelectionActive,
-      isItemSelectionActive: jsonStore.isItemSelectionActive,
-      currentItemId: jsonStore.currentItemId
-    });
-    
     switch (message.action) {
       case 'elementSelected':
         if (jsonStore.isSelectionActive && message.data) {
-          console.log('Regular selection:', message.data);
-          // Regular element selection
+          // Add the selected value with xpath, cssSelector, and fullXPath
           jsonStore.addSelectedValue(
             message.data.text || '',
             message.data.xpath,
@@ -84,33 +61,18 @@ export function setupElementSelectionListeners(): void {
           );
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
-        } else if (jsonStore.isRootSelectionActive && message.data) {
-          console.log('Root selection:', message.data);
-          // Root element selection for list
-          jsonStore.addSelectedRootValue(message.data.fullXPath);
-          // Clear the live preview
-          uiStore.setLivePreviewInfo(null);
-        } else if (jsonStore.isItemSelectionActive && message.data) {
-          console.log('Item selection:', message.data);
-          // Item element selection for list
-          jsonStore.addSelectedItemValue(
-            message.data.text || '',
-            message.data.fullXPath
-          );
-          // Clear the live preview
-          uiStore.setLivePreviewInfo(null);
         }
         break;
         
       case 'scrollingModeActive':
-        if (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive || jsonStore.isItemSelectionActive) {
+        if (jsonStore.isSelectionActive) {
           jsonStore.setScrollingMode(message.data);
         }
         break;
         
       case 'elementHighlighted':
         // Update the live preview
-        if (message.data && (jsonStore.isSelectionActive || jsonStore.isRootSelectionActive || jsonStore.isItemSelectionActive)) {
+        if (message.data && jsonStore.isSelectionActive) {
           const previewInfo: LivePreviewInfo = {
             tagName: message.data.tagName,
             text: message.data.text || '',

@@ -74,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle messages from the side panel
   if (message.action === 'startElementSelection') {
-    console.log('Handling startElementSelection message with selection state:', message.selectionState);
+    console.log('Handling startElementSelection message');
     // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       console.log('Active tabs query result:', tabs);
@@ -89,8 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           console.log('Sending activateSelectionMode message to tab:', tab.id);
           // Send a message to the content script to activate selection mode
           chrome.tabs.sendMessage(tab.id, { 
-            action: 'activateSelectionMode',
-            selectionState: message.selectionState
+            action: 'activateSelectionMode'
           }, (response) => {
             console.log('activateSelectionMode response:', response);
             sendResponse(response);
