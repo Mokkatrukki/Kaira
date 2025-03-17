@@ -5,6 +5,7 @@
 // State variables
 let isSelectionActive = false;
 let isScrollingMode = false;
+let isSelectingRoot = false;
 let highlightedElement: Element | null = null;
 let highlightOverlay: HTMLElement | null = null;
 
@@ -171,7 +172,7 @@ function getElementInfo(element: Element): any {
   
   const fullXPath = generateFullXPath(element);
   
-  return {
+  const info = {
     tagName: element.tagName.toLowerCase(),
     id: element.id || null,
     classes: Array.from(element.classList),
@@ -185,6 +186,9 @@ function getElementInfo(element: Element): any {
     fullXPath: fullXPath,
     html: element.outerHTML.substring(0, 500)
   };
+  
+  console.log('Generated element info:', info);
+  return info;
 }
 
 // Function to get basic element information for live preview
@@ -275,6 +279,11 @@ const overlay = {
     highlightOverlay.style.height = `${rect.height}px`;
     highlightOverlay.style.display = 'block';
     
+    // Use the same highlight style for all selection modes
+    highlightOverlay.style.border = '2px solid #1a73e8';
+    highlightOverlay.style.backgroundColor = 'rgba(26, 115, 232, 0.1)';
+    highlightOverlay.style.boxShadow = '0 0 0 2000px rgba(0, 0, 0, 0.05)';
+    
     // Update the label with just the element tag name
     const label = highlightOverlay.querySelector('#kaira-element-label') as HTMLElement;
     if (label) {
@@ -320,13 +329,19 @@ const handlers = {
     // Update the highlighted element
     highlightedElement = target;
     
-    // Position the highlight overlay
+    // Always position the highlight overlay, but with different styles based on selection mode
     overlay.position(target);
+    
+    // Send the element info for preview
+    sendHighlightedElementInfo(target);
   },
   
   // Handle click events
   click: (event: MouseEvent): void => {
-    if (!isSelectionActive) return;
+    if (!isSelectionActive) {
+      console.log('Selection not active, ignoring click');
+      return;
+    }
     
     // Prevent default behavior
     event.preventDefault();
@@ -334,9 +349,11 @@ const handlers = {
     
     // Get the target element
     const target = event.target as Element;
+    console.log('Click on element:', target.tagName, 'with ID:', target.id);
     
     // If we're already in scrolling mode, check if the click is on the highlighted element
     if (isScrollingMode) {
+      console.log('In scrolling mode, checking if click is on highlighted element');
       // Check if the click is within the highlighted element's area
       if (highlightedElement) {
         const rect = highlightedElement.getBoundingClientRect();
@@ -348,10 +365,12 @@ const handlers = {
         );
         
         if (isInHighlightedArea) {
+          console.log('Click is in highlighted area, selecting element');
           // Select the current highlighted element
           const elementInfo = getElementInfo(highlightedElement);
           
           // Send the element information to the side panel
+          console.log('Sending elementSelected message with data:', elementInfo);
           chrome.runtime.sendMessage({
             action: 'elementSelected',
             data: elementInfo
@@ -361,11 +380,14 @@ const handlers = {
           deactivateSelectionMode();
           return;
         } else {
+          console.log('Click is outside highlighted area, exiting scrolling mode');
           // Exit scrolling mode and go back to hover mode
           isScrollingMode = false;
           
           // Update the highlighted element to the clicked element
           highlightedElement = target;
+          
+          // Position the highlight overlay with appropriate style
           overlay.position(target);
           
           // Notify side panel that we're back to hover mode
@@ -382,6 +404,8 @@ const handlers = {
     // If we're not in scrolling mode, enter scrolling mode
     isScrollingMode = true;
     highlightedElement = target;
+    
+    // Position the highlight overlay with appropriate style
     overlay.position(target);
     
     // Update status in side panel
@@ -424,6 +448,7 @@ const handlers = {
 
 // Function to activate selection mode
 function activateSelectionMode(): void {
+  console.log('Activating selection mode');
   isSelectionActive = true;
   isScrollingMode = false;
   
@@ -436,16 +461,21 @@ function activateSelectionMode(): void {
   document.body.style.cursor = 'crosshair';
   
   // Send message to side panel that selection mode is active
+  console.log('Sending selectionModeActive message');
   chrome.runtime.sendMessage({
     action: 'selectionModeActive',
     data: true
   });
+  
+  console.log('Selection mode activated');
 }
 
 // Function to deactivate selection mode
 function deactivateSelectionMode(): void {
+  console.log('Deactivating selection mode');
   isSelectionActive = false;
   isScrollingMode = false;
+  isSelectingRoot = false;
   
   // Remove event listeners
   document.removeEventListener('mouseover', handlers.mouseOver, true);
@@ -459,23 +489,39 @@ function deactivateSelectionMode(): void {
   overlay.remove();
   
   // Send message to side panel that selection mode is inactive
+  console.log('Sending selectionModeActive message with false');
   chrome.runtime.sendMessage({
     action: 'selectionModeActive',
     data: false
   });
   
   // Send message that scrolling mode is inactive
+  console.log('Sending scrollingModeActive message with false');
   chrome.runtime.sendMessage({
     action: 'scrollingModeActive',
     data: false
   });
+  
+  console.log('Selection mode deactivated');
 }
 
 // Listen for messages from the extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Content script received message:', message);
+  
   switch (message.action) {
     case 'activateSelectionMode':
+      console.log('Activating selection mode with state:', message.selectionState);
+      
+      // Set the selection state flags
+      isSelectingRoot = message.selectionState?.isRootSelectionActive || false;
+      
+      console.log('isSelectingRoot set to:', isSelectingRoot);
+      
+      // Activate selection mode
       activateSelectionMode();
+      
+      // Send response
       sendResponse({ success: true });
       break;
       
@@ -485,7 +531,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
   }
   
-  // Return true to indicate that we will send a response asynchronously
+  // Return true to indicate async response
   return true;
 });
 
