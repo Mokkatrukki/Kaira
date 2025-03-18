@@ -78,6 +78,16 @@ src/
    - The collection includes URL and timestamp for each item
    - Copy the Collection JSON when you're done
 
+5. **Working with List Items**
+   - Click "Add List Item" to create a list-based selector
+   - Enter a key name for your list
+   - Click "Select Root" to choose the container element (like a UL or DIV)
+   - After selecting a root container, click "Select Item" to choose list elements
+   - When selecting an item, the extension will find all similar elements with the same structure
+   - The highlighted elements show you what will be included in your collection
+   - All matching elements will be extracted as an array in your JSON
+   - This is perfect for repeating elements like products, search results, or navigation items
+
 ## Development Principles
 
 ### Keep It Simple
@@ -118,6 +128,11 @@ interface KeyValueItem {
   value: string;
   xpath?: string;
   cssSelector?: string;
+  fullXPath?: string;
+  isList?: boolean;
+  rootFullXPath?: string;
+  relativeXPath?: string;
+  listItems?: string[];
 }
 
 // LivePreviewInfo for displaying element information
@@ -125,15 +140,82 @@ interface LivePreviewInfo {
   tagName: string;
   text: string;
   xpath: string;
+  fullXPath?: string;
+  relativeXPath?: string;
+  matchingCount?: number;
 }
 
 // CollectedItem for storing collected data
 interface CollectedItem {
   url: string;
   timestamp: string;
-  data: Record<string, string>;
+  data: Record<string, string | string[]>;
 }
 ```
+
+### List Item Selection Technical Details
+
+The list item selection feature uses a sophisticated approach to identify and collect repeating elements:
+
+1. **Root Element Selection**:
+   - User selects a container element (like a UL or DIV)
+   - We store its full XPath as `rootFullXPath`
+   - This element serves as the context for finding list items
+
+2. **Relative XPath Generation**:
+   - When selecting a child element, we compute its path relative to the root
+   - We strip numeric indices from the path (e.g., `li[3]/div[1]/h3[1]` → `li/div/h3`)
+   - This generic path can match multiple similar elements regardless of position
+
+3. **Element Matching**:
+   - The system looks for all elements matching the generic path
+   - It highlights matching elements in real-time as the user hovers
+   - If direct matching fails, it attempts a more flexible approach:
+     - Find elements with the same tag name
+     - Verify parent structure matches the expected hierarchy
+     - Include elements that follow the same pattern
+
+4. **Smart Selection Behavior**:
+   - If hovering over an element with no matches, we check parent elements
+   - The system aims to find the most appropriate selector level with multiple matches
+   - Users can navigate the DOM tree with the scroll wheel to refine selection
+
+5. **List Item Collection**:
+   - When "Collect Items" is clicked, the system:
+     - Finds the root element using its full XPath
+     - Locates all children matching the relative XPath pattern
+     - Extracts text content from each matching element
+     - Returns an array of values in the collection
+
+6. **Selector JSON Format**:
+   ```json
+   {
+     "products": {
+       "type": "list",
+       "rootElement": {
+         "fullXPath": "/html/body/div/main/div/ul",
+         "xpath": "",
+         "cssSelector": ""
+       },
+       "itemSelector": {
+         "relativeXPath": "li/div/h3"
+       }
+     }
+   }
+   ```
+
+7. **Results JSON Format**:
+   ```json
+   {
+     "products": [
+       "Product 1",
+       "Product 2",
+       "Product 3"
+     ]
+   }
+   ```
+
+This approach makes it possible to scrape lists of elements with a single selection action, greatly improving efficiency for data collection tasks.
 
 ### Message Protocol
 
@@ -142,19 +224,38 @@ The extension uses Chrome's messaging API with the following message formats:
 ```typescript
 // From side panel to background script
 { action: 'startElementSelection' }
+{ action: 'startListItemSelection', rootXPath: string }
 
 // From background to content script
 { action: 'activateSelectionMode' }
+{ action: 'activateListItemSelectionMode', rootXPath: string }
+{ action: 'deactivateSelectionMode' }
 
 // From content script to side panel
 { 
   action: 'elementHighlighted', 
-  data: { tagName: string, text: string, xpath: string } 
+  data: { 
+    tagName: string, 
+    text: string, 
+    xpath: string,
+    fullXPath?: string,
+    relativeXPath?: string,
+    matchingCount?: number 
+  } 
 }
 
 { 
   action: 'elementSelected', 
-  data: { text: string, xpath: string, cssSelector: string } 
+  data: { 
+    text: string, 
+    xpath: string, 
+    cssSelector: string,
+    fullXPath?: string,
+    isListItem?: boolean,
+    relativeXPath?: string,
+    matchingValues?: string[],
+    matchingCount?: number
+  } 
 }
 
 { 
@@ -171,10 +272,20 @@ The extension uses Chrome's messaging API with the following message formats:
    - Content script activates selection mode → user selects element
    - Selection data sent back → `setupElementSelectionListeners()` processes → updates store
 
-2. **Data Collection Flow**:
+2. **List Item Selection Flow**:
+   - User adds a list item → clicks "Select Root" → `startElementSelection()`
+   - Root element selected → stored as `rootFullXPath` → root highlighted
+   - User clicks "Select Item" → `startListItemSelection(rootFullXPath)`
+   - Content script finds root element and activates list item mode
+   - As user hovers, matching elements are highlighted in real-time
+   - When user clicks, all matching elements' values are collected
+   - Data stored as an array under the list item's key
+
+3. **Data Collection Flow**:
    - User clicks "Collect Items" → `handleCollectItems()` → `collectItems()`
    - Store creates selectors object from items
    - Script executed in page context to find elements using selectors
+   - For list items, all matches for relativeXPath under root are collected
    - Results added to collection with URL and timestamp
    - Collection JSON updated to show collected items
 
