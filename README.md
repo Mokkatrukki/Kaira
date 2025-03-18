@@ -31,6 +31,11 @@ Perfect for web scraping, test automation, and data extraction tasks.
 - **State Management**: Zustand stores for managing application state
   - `useJsonBuilderStore`: Manages JSON data and selection state
   - `useStore`: Manages UI-related state like live preview
+  - Modular architecture with separate concerns:
+    - Types and interfaces in `types.ts`
+    - Helper functions in `utils.ts`
+    - JSON building logic in `jsonBuilderStore.ts`
+    - UI state in `uiStore.ts`
 
 - **Data Collection**: System for collecting data from multiple pages
   - Selectors-based element finding
@@ -46,7 +51,13 @@ src/
 ├── sidepanel/           # Side panel UI components
 │   ├── components/      # React components
 │   ├── elementSelection.ts  # Element selection utilities
-│   ├── store.ts         # Zustand state management
+│   ├── store.ts         # Zustand state management (re-exports from store/)
+│   ├── store/           # Modular store implementation
+│   │   ├── types.ts     # Type definitions
+│   │   ├── utils.ts     # Helper functions
+│   │   ├── jsonBuilderStore.ts  # Main data store
+│   │   ├── uiStore.ts   # UI state store
+│   │   └── index.ts     # Exports for all store modules
 │   └── ...              # Other UI files
 └── manifest.json        # Extension configuration
 ```
@@ -113,6 +124,10 @@ src/
 - Keep related code together
 - Use clear naming conventions
 - Document complex logic with comments
+- Split large files into modular components:
+  - The store implementation is modularized for better maintainability
+  - Each module has a single responsibility
+  - Types, utilities, and state logic are separated
 
 ## For AI Assistance
 
