@@ -108,6 +108,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   
+  // Handle startListItemSelection message for list items
+  if (message.action === 'startListItemSelection') {
+    console.log('Handling startListItemSelection message with rootXPath:', message.rootXPath);
+    // Get the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      console.log('Active tabs query result:', tabs);
+      const tab = tabs[0];
+      
+      if (tab && tab.id) {
+        console.log('Found active tab with ID:', tab.id);
+        // Inject the content script if needed
+        const injected = await injectContentScript(tab.id);
+        
+        if (injected) {
+          console.log('Sending activateListItemSelectionMode message to tab:', tab.id);
+          // Send a message to the content script to activate list item selection mode
+          chrome.tabs.sendMessage(tab.id, { 
+            action: 'activateListItemSelectionMode',
+            rootXPath: message.rootXPath
+          }, (response) => {
+            console.log('activateListItemSelectionMode response:', response);
+            sendResponse(response);
+          });
+        } else {
+          console.error('Failed to inject content script');
+          sendResponse({ success: false, error: 'Failed to inject content script' });
+        }
+      } else {
+        console.error('No active tab found');
+        sendResponse({ success: false, error: 'No active tab found' });
+      }
+    });
+    
+    // Return true to indicate that we will send a response asynchronously
+    return true;
+  }
+  
   // Handle deactivateSelectionMode message from the side panel
   if (message.action === 'deactivateSelectionMode') {
     console.log('Handling deactivateSelectionMode message from side panel');

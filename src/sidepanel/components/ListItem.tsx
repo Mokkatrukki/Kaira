@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { KeyValueItem as KeyValueItemType, useJsonBuilderStore } from '../store';
-import { startElementSelection } from '../elementSelection';
+import { startElementSelection, startListItemSelection } from '../elementSelection';
 
 interface ListItemProps {
   item: KeyValueItemType;
@@ -63,7 +63,7 @@ const ListItem: React.FC<ListItemProps> = ({
     setIsSelecting(true);
     onStartItemSelection(item.id);
     
-    const success = await startElementSelection();
+    const success = await startListItemSelection(item.rootFullXPath);
     if (!success) {
       setIsSelecting(false);
     }
@@ -130,10 +130,10 @@ const ListItem: React.FC<ListItemProps> = ({
       const displayText = displayItems.map(text => `"${text}"`).join(', ');
       
       if (item.listItems.length > 3) {
-        return `[${displayText}, ... (${item.listItems.length - 3} more)]`;
+        return `[${displayText}, ... (${item.listItems.length - 3} more items)]`;
       }
       
-      return `[${displayText}]`;
+      return `[${displayText}] (${item.listItems.length} items total)`;
     }
     
     return 'List root element selected. Click "Select Item" to add items.';

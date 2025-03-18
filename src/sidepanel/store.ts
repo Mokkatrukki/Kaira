@@ -33,6 +33,8 @@ export interface LivePreviewInfo {
   text: string;
   xpath: string;
   fullXPath?: string;
+  relativeXPath?: string;
+  matchingCount?: number;
 }
 
 // Interface for a collected item
@@ -75,13 +77,58 @@ interface JsonBuilderStore {
   setScrollingMode: (isActive: boolean) => void;
   addSelectedValue: (value: string, xpath?: string, cssSelector?: string, fullXPath?: string) => void;
   addSelectedRootValue: (fullXPath: string) => void;
-  addSelectedItemValue: (value: string, fullXPath: string) => void;
+  addSelectedItemValue: (value: string, fullXPath: string, relativeXPath?: string, matchingValues?: string[]) => void;
   resetSelection: () => void;
   clear: () => void;
   
   // Collection actions
   collectItems: () => Promise<boolean>;
   clearCollection: () => void;
+}
+
+// Helper function to extract relative XPath from full XPath
+function getRelativeXPathFromFullXPath(fullXPath: string, rootXPath?: string): string {
+  if (!rootXPath || !fullXPath) return '';
+  
+  // If the fullXPath starts with rootXPath, just extract the relative part
+  if (fullXPath.startsWith(rootXPath)) {
+    let relativeXPath = fullXPath.substring(rootXPath.length);
+    // If the relative path starts with a slash, remove it
+    if (relativeXPath.startsWith('/')) {
+      relativeXPath = relativeXPath.substring(1);
+    }
+    
+    // For list items, we need a more generic pattern:
+    // Convert patterns like "li[3]/div[1]/div[1]" to "li/div/div" to match all similar elements
+    return relativeXPath.replace(/\[\d+\]/g, '');
+  }
+  
+  // If the paths don't match directly, try to find a common prefix
+  const rootParts = rootXPath.split('/');
+  const fullParts = fullXPath.split('/');
+  let commonPrefixLength = 0;
+  
+  for (let i = 0; i < Math.min(rootParts.length, fullParts.length); i++) {
+    if (rootParts[i] === fullParts[i]) {
+      commonPrefixLength++;
+    } else {
+      break;
+    }
+  }
+  
+  if (commonPrefixLength > 0) {
+    // Extract the parts after the common prefix and make them generic by removing indices
+    return fullParts.slice(commonPrefixLength).join('/').replace(/\[\d+\]/g, '');
+  }
+  
+  // Fallback: just use the tag name as a simple selector
+  const tagMatch = fullXPath.match(/\/([^\/\[\]]+)(?:\[\d+\])?$/);
+  if (tagMatch) {
+    return tagMatch[1];
+  }
+  
+  console.error('Could not extract relative XPath from', fullXPath);
+  return '';
 }
 
 // Create the store
@@ -385,144 +432,43 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
     });
   },
   
-  addSelectedItemValue: (value: string, fullXPath: string) => {
-    const { currentItemId, items, data } = get();
+  addSelectedItemValue: (value: string, fullXPath: string, relativeXPath?: string, matchingValues?: string[]) => {
+    const { items, data, currentItemId } = get();
     
     if (!currentItemId) return;
     
-    const item = items.find((item: KeyValueItem) => item.id === currentItemId);
-    if (!item || !item.rootFullXPath) return;
+    // Find the current item
+    const currentItem = items.find(item => item.id === currentItemId);
     
-    // Extract the relative XPath by removing the root XPath from the full XPath
-    let relativeXPath = '';
-    if (fullXPath.startsWith(item.rootFullXPath)) {
-      relativeXPath = fullXPath.substring(item.rootFullXPath.length);
-      // If the relative path starts with a slash, remove it
-      if (relativeXPath.startsWith('/')) {
-        relativeXPath = relativeXPath.substring(1);
-      }
-    } else {
-      // If the fullXPath doesn't start with rootFullXPath, try to find a common prefix
-      const rootParts = item.rootFullXPath.split('/');
-      const fullParts = fullXPath.split('/');
-      let commonPrefixLength = 0;
-      
-      for (let i = 0; i < Math.min(rootParts.length, fullParts.length); i++) {
-        if (rootParts[i] === fullParts[i]) {
-          commonPrefixLength++;
-        } else {
-          break;
-        }
-      }
-      
-      if (commonPrefixLength > 0) {
-        relativeXPath = fullParts.slice(commonPrefixLength).join('/');
-      } else {
-        // Fallback: just use the tag name as a simple selector
-        const tagMatch = fullXPath.match(/\/([^\/\[\]]+)(?:\[\d+\])?$/);
-        if (tagMatch) {
-          relativeXPath = tagMatch[1];
-        } else {
-          console.error('Could not extract relative XPath from', fullXPath);
-          relativeXPath = fullXPath; // Use full XPath as a fallback
-        }
-      }
-    }
+    if (!currentItem || !currentItem.key) return;
     
-    console.log('Extracted relative XPath:', relativeXPath);
+    // Use the provided matching values array (from all elements with same XPath) or create a single-item array
+    const valueArray = matchingValues || [value];
     
-    // Make the relative XPath more generic by removing index selectors [n]
-    // This will match all similar elements, not just the specific one selected
-    const genericRelativeXPath = relativeXPath.replace(/\[\d+\]/g, '');
-    
-    console.log('Generic relative XPath:', genericRelativeXPath);
-    
-    // Get the current list items or initialize an empty array
-    const currentListItems = Array.isArray(item.listItems) ? [...item.listItems] : [];
-    
-    // Add the new value to the list
-    currentListItems.push(value);
-    
-    // Update the item with the new list items and the relative XPath
-    const updatedItems = items.map((i: KeyValueItem) => 
-      i.id === currentItemId ? { 
-        ...i, 
-        listItems: currentListItems,
-        value: JSON.stringify(currentListItems),
-        relativeXPath: genericRelativeXPath
-      } : i
-    );
-    
-    // Update the data object with the list items
+    // Update the data object with the array of values 
     const newData = { ...data };
-    if (item.key) {
-      newData[item.key] = currentListItems;
-    }
+    newData[currentItem.key] = valueArray;
     
-    set({
-      items: updatedItems,
-      data: newData,
-      isItemSelectionActive: false,
-      currentItemId: null,
-      isScrollingMode: false
+    // Update the items array with relativeXPath info
+    const updatedItems = items.map(item => {
+      if (item.id === currentItemId) {
+        return {
+          ...item,
+          relativeXPath: relativeXPath || getRelativeXPathFromFullXPath(fullXPath, item.rootFullXPath),
+          listItems: valueArray
+        };
+      }
+      return item;
     });
     
-    // Highlight the selected item temporarily
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      try {
-        if (!tabs[0]?.id) {
-          console.error('No active tab found');
-          return;
-        }
-        
-        await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id },
-          func: (itemXPath) => {
-            try {
-              // Find the selected item
-              const itemElement = document.evaluate(
-                itemXPath as string,
-                document,
-                null,
-                XPathResult.FIRST_ORDERED_NODE_TYPE,
-                null
-              ).singleNodeValue as HTMLElement;
-              
-              if (!itemElement) return;
-              
-              // Store original styles
-              const originalBackground = itemElement.style.backgroundColor;
-              const originalColor = itemElement.style.color;
-              const originalOutline = itemElement.style.outline;
-              
-              // Apply highlight to the selected item
-              itemElement.style.backgroundColor = "rgba(142, 68, 173, 0.2)"; // Purple with transparency
-              itemElement.style.outline = "2px solid #8e44ad";
-              
-              // Reset after 1.5 seconds
-              setTimeout(() => {
-                try {
-                  itemElement.style.backgroundColor = originalBackground;
-                  itemElement.style.color = originalColor;
-                  itemElement.style.outline = originalOutline;
-                } catch (e) {
-                  // Element might no longer be in the DOM, ignore
-                }
-              }, 1500);
-              
-              return true; // Return a value to prevent "message port closed" error
-            } catch (error) {
-              console.error('Error highlighting selected item:', error);
-              return false; // Return a value to prevent "message port closed" error
-            }
-          },
-          args: [fullXPath]
-        }).catch(error => {
-          console.error('Error executing script for item highlight:', error);
-        });
-      } catch (error) {
-        console.error('Error with chrome.tabs.query or chrome.scripting.executeScript:', error);
-      }
+    // Update state
+    set({
+      data: newData,
+      items: updatedItems,
+      isSelectionActive: false,
+      isRootSelectionActive: false,
+      isItemSelectionActive: false,
+      currentItemId: null
     });
   },
   
@@ -692,14 +638,13 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
                   if (selectorObj.itemSelector?.relativeXPath) {
                     const relativeXPath = selectorObj.itemSelector.relativeXPath;
                     
-                    // Create a more specific XPath for evaluation by adding wildcards for indices
-                    // This will match all elements with the same structure
-                    const xpathForEvaluation = `.${relativeXPath.replace(/\/([^\/]+)(?!\[)/g, '/$1[*]')}`;
-                    console.log('XPath for evaluation:', xpathForEvaluation);
+                    // Create XPath for evaluation by removing all indices to match all similar elements
+                    const genericXPath = `./${relativeXPath.replace(/\[\d+\]/g, '')}`;
+                    console.log('XPath for collection:', genericXPath);
                     
                     try {
                       const xpathResult = document.evaluate(
-                        xpathForEvaluation,
+                        genericXPath,
                         rootElement,
                         null,
                         XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
@@ -717,6 +662,51 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
                         if (node) {
                           listItems.push(node.textContent?.trim() || '');
                           elementsToHighlight.push(node);
+                        }
+                      }
+                      
+                      // If we didn't find any elements, try a more flexible approach
+                      if (listItems.length === 0) {
+                        // Try to extract the last tag and find all elements with that tag
+                        const lastTagMatch = relativeXPath.match(/\/([^\/]+)$/);
+                        if (lastTagMatch && lastTagMatch[1]) {
+                          const lastTag = lastTagMatch[1].replace(/\[\d+\]/, '');
+                          console.log(`Trying more flexible collection for tag: ${lastTag}`);
+                          
+                          // Find all elements with this tag under the root
+                          const allElements = Array.from((rootElement as HTMLElement).querySelectorAll(lastTag));
+                          
+                          // Filter elements to those that likely match our pattern
+                          const pathParts = relativeXPath.split('/').filter(part => part);
+                          
+                          // For each element, check if it has the expected parent structure
+                          allElements.forEach((element: Element) => {
+                            let currentEl: Element = element;
+                            let matches = true;
+                            
+                            // Check parent hierarchy (up to 3 levels) to see if it matches expected structure
+                            for (let i = pathParts.length - 2; i >= 0 && i >= pathParts.length - 4; i--) {
+                              currentEl = currentEl.parentElement as Element;
+                              if (!currentEl || currentEl === rootElement) {
+                                // Stop if we reach the root or run out of parents
+                                if (i > 0) matches = false;
+                                break;
+                              }
+                              
+                              const expectedTag = pathParts[i].replace(/\[\d+\]/, '');
+                              if (currentEl.tagName.toLowerCase() !== expectedTag) {
+                                matches = false;
+                                break;
+                              }
+                            }
+                            
+                            if (matches) {
+                              listItems.push(element.textContent?.trim() || '');
+                              elementsToHighlight.push(element);
+                            }
+                          });
+                          
+                          console.log(`Found ${listItems.length} elements with flexible matching`);
                         }
                       }
                       
@@ -754,7 +744,7 @@ export const useJsonBuilderStore = create<JsonBuilderStore>((set, get) => ({
                       
                       results[key] = listItems;
                     } catch (error) {
-                      console.error(`Error evaluating XPath ${xpathForEvaluation}:`, error);
+                      console.error(`Error evaluating XPath ${genericXPath}:`, error);
                       
                       // Fallback: try a simpler approach by selecting all elements of the same type
                       try {

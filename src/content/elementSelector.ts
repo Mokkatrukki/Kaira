@@ -8,6 +8,21 @@ let isScrollingMode = false;
 let highlightedElement: Element | null = null;
 let highlightOverlay: HTMLElement | null = null;
 
+// List item selection state
+let isListItemSelectionMode = false;
+let rootElement: Element | null = null;
+let rootXPath: string = '';
+let matchingElements: Element[] = [];
+let matchingOverlays: HTMLElement[] = [];
+
+// Debug mode
+const DEBUG = true;
+function debug(...args: any[]) {
+  if (DEBUG) {
+    console.log('[KAIRA Debug]', ...args);
+  }
+}
+
 // Function to generate a CSS selector for an element
 function generateCssSelector(element: Element): string {
   if (!element || element === document.body) {
@@ -322,6 +337,92 @@ const handlers = {
     
     // Position the highlight overlay
     overlay.position(target);
+    
+    // For list item selection, highlight all matching elements
+    if (isListItemSelectionMode && rootElement) {
+      // Get the relative XPath from the root element to the target
+      const relativeXPath = getRelativeXPath(target, rootElement);
+      
+      if (relativeXPath) {
+        debug('Mouse over element with relative XPath:', relativeXPath);
+        
+        // Find all elements matching this relative XPath
+        const matchingEls = findMatchingElements(relativeXPath, rootElement);
+        
+        if (matchingEls.length > 0) {
+          debug(`Found ${matchingEls.length} matching elements for highlighting`);
+          
+          // Highlight all matching elements
+          highlightMatchingElements(matchingEls);
+          
+          // Send the relative XPath with the highlighted element info for preview
+          const elementInfo = getLivePreviewInfo(target);
+          elementInfo.relativeXPath = relativeXPath;
+          elementInfo.matchingCount = matchingEls.length;
+          
+          chrome.runtime.sendMessage({
+            action: 'elementHighlighted',
+            data: elementInfo
+          });
+        } else {
+          debug('No matching elements found with this XPath');
+          
+          // Try to find a better target element - look for parents that might have matches
+          let betterTarget = target;
+          let bestMatchCount = 0;
+          let currentEl = target;
+          
+          // Check up to 3 parent levels
+          for (let i = 0; i < 3; i++) {
+            if (!currentEl.parentElement || currentEl.parentElement === rootElement) break;
+            
+            currentEl = currentEl.parentElement;
+            const parentRelXPath = getRelativeXPath(currentEl, rootElement);
+            const parentMatches = findMatchingElements(parentRelXPath, rootElement);
+            
+            debug(`Parent level ${i+1}: ${parentRelXPath} -> ${parentMatches.length} matches`);
+            
+            // If we found more matches with this parent, use it instead
+            if (parentMatches.length > bestMatchCount) {
+              bestMatchCount = parentMatches.length;
+              betterTarget = currentEl;
+            }
+          }
+          
+          // If we found a better target with matches, use it
+          if (bestMatchCount > 0 && betterTarget !== target) {
+            debug(`Using better target element with ${bestMatchCount} matches`);
+            highlightedElement = betterTarget;
+            overlay.position(betterTarget);
+            
+            const betterRelXPath = getRelativeXPath(betterTarget, rootElement);
+            const betterMatches = findMatchingElements(betterRelXPath, rootElement);
+            highlightMatchingElements(betterMatches);
+            
+            // Send updated info
+            const betterInfo = getLivePreviewInfo(betterTarget);
+            betterInfo.relativeXPath = betterRelXPath;
+            betterInfo.matchingCount = betterMatches.length;
+            
+            chrome.runtime.sendMessage({
+              action: 'elementHighlighted',
+              data: betterInfo
+            });
+          } else {
+            // Clear any existing matching highlights if there are no matches
+            clearMatchingHighlights();
+            sendHighlightedElementInfo(target);
+          }
+        }
+      } else {
+        // No relative XPath (might be the root itself)
+        clearMatchingHighlights();
+        sendHighlightedElementInfo(target);
+      }
+    } else {
+      // For regular selection, just send the highlighted element info
+      sendHighlightedElementInfo(target);
+    }
   },
   
   // Handle click events
@@ -348,14 +449,56 @@ const handlers = {
         );
         
         if (isInHighlightedArea) {
-          // Select the current highlighted element
-          const elementInfo = getElementInfo(highlightedElement);
-          
-          // Send the element information to the side panel
-          chrome.runtime.sendMessage({
-            action: 'elementSelected',
-            data: elementInfo
-          });
+          if (isListItemSelectionMode && rootElement && matchingElements.length > 0) {
+            // For list items, collect all matching elements
+            const relativeXPath = getRelativeXPath(highlightedElement, rootElement);
+            
+            if (relativeXPath) {
+              // Get all matching values
+              const values = matchingElements.map(el => el.textContent?.trim() || '');
+              
+              // Get element info for the highlighted element
+              const elementInfo = getElementInfo(highlightedElement);
+              
+              // Add list-specific data 
+              elementInfo.isListItem = true;
+              elementInfo.relativeXPath = relativeXPath;
+              elementInfo.matchingValues = values;
+              elementInfo.matchingCount = matchingElements.length;
+              
+              // Include more information about the matches for debugging
+              elementInfo.matchesInfo = matchingElements.map(el => ({
+                tag: el.tagName.toLowerCase(),
+                text: el.textContent?.trim() || '',
+                path: rootElement ? getRelativeXPath(el, rootElement) : ''
+              }));
+              
+              // Log for debugging
+              console.log('Selected list item with matches:', {
+                relativeXPath,
+                matchCount: matchingElements.length,
+                values
+              });
+              
+              // Send the element information to the side panel
+              chrome.runtime.sendMessage({
+                action: 'elementSelected',
+                data: elementInfo
+              });
+              
+              // Clear matching highlights
+              clearMatchingHighlights();
+            }
+          } else {
+            // For regular items, select just the current element
+            const elementInfo = getElementInfo(highlightedElement);
+            
+            // Send the element information to the side panel
+            chrome.runtime.sendMessage({
+              action: 'elementSelected',
+              data: elementInfo
+            });
+          }
           
           // Deactivate selection mode
           deactivateSelectionMode();
@@ -367,6 +510,11 @@ const handlers = {
           // Update the highlighted element to the clicked element
           highlightedElement = target;
           overlay.position(target);
+          
+          // Clear matching highlights for list items
+          if (isListItemSelectionMode) {
+            clearMatchingHighlights();
+          }
           
           // Notify side panel that we're back to hover mode
           chrome.runtime.sendMessage({
@@ -384,6 +532,16 @@ const handlers = {
     highlightedElement = target;
     overlay.position(target);
     
+    // For list items, find and highlight matching elements
+    if (isListItemSelectionMode && rootElement) {
+      const relativeXPath = getRelativeXPath(target, rootElement);
+      
+      if (relativeXPath) {
+        const matchingEls = findMatchingElements(relativeXPath, rootElement);
+        highlightMatchingElements(matchingEls);
+      }
+    }
+    
     // Update status in side panel
     chrome.runtime.sendMessage({
       action: 'scrollingModeActive',
@@ -392,7 +550,21 @@ const handlers = {
     
     // Send initial element info for live preview
     if (highlightedElement) {
-      sendHighlightedElementInfo(highlightedElement);
+      if (isListItemSelectionMode && rootElement) {
+        const relativeXPath = getRelativeXPath(highlightedElement, rootElement);
+        if (relativeXPath) {
+          const elementInfo = getLivePreviewInfo(highlightedElement);
+          elementInfo.relativeXPath = relativeXPath;
+          elementInfo.matchingCount = matchingElements.length;
+          
+          chrome.runtime.sendMessage({
+            action: 'elementHighlighted',
+            data: elementInfo
+          });
+        }
+      } else {
+        sendHighlightedElementInfo(highlightedElement);
+      }
     }
   },
   
@@ -419,8 +591,218 @@ const handlers = {
     
     // Update highlight overlay
     overlay.position(highlightedElement);
+    
+    // For list items, update matching elements
+    if (isListItemSelectionMode && rootElement) {
+      // Clear previous matching highlights
+      clearMatchingHighlights();
+      
+      // Get new relative XPath and find matching elements
+      const relativeXPath = getRelativeXPath(highlightedElement, rootElement);
+      
+      if (relativeXPath) {
+        const matchingEls = findMatchingElements(relativeXPath, rootElement);
+        highlightMatchingElements(matchingEls);
+        
+        // Send updated element info
+        const elementInfo = getLivePreviewInfo(highlightedElement);
+        elementInfo.relativeXPath = relativeXPath;
+        elementInfo.matchingCount = matchingEls.length;
+        
+        chrome.runtime.sendMessage({
+          action: 'elementHighlighted',
+          data: elementInfo
+        });
+      } else {
+        // No valid relative XPath (might be the root element itself or outside)
+        sendHighlightedElementInfo(highlightedElement);
+      }
+    } else {
+      // For regular selection, just send updated element info
+      sendHighlightedElementInfo(highlightedElement);
+    }
   }
 };
+
+// Function to get the relative XPath for an element from its root
+function getRelativeXPath(element: Element, rootEl: Element): string {
+  if (!element || !rootEl) return '';
+  
+  // Check if element is the root or outside of it
+  if (element === rootEl || !rootEl.contains(element)) {
+    return '';
+  }
+  
+  // Build path from the element up to the root (but not including the root)
+  let path = '';
+  let currentElement: Element | null = element;
+  
+  while (currentElement && currentElement !== rootEl) {
+    // Get the tag name of the current element
+    const tagName = currentElement.tagName.toLowerCase();
+    
+    // Get the position among siblings with the same tag name
+    // We'll include it in the XPath string but we'll strip it later
+    // to make it more generic
+    const siblings = Array.from(currentElement.parentElement?.children || [])
+      .filter(child => child.tagName.toLowerCase() === tagName);
+    
+    let position = '';
+    if (siblings.length > 1) {
+      position = `[${Array.from(siblings).indexOf(currentElement) + 1}]`;
+    }
+    
+    // Add this segment to the path
+    path = `/${tagName}${position}${path}`;
+    
+    // Move up to the parent
+    currentElement = currentElement.parentElement;
+  }
+  
+  // Remove the first slash if there is one
+  if (path.startsWith('/')) {
+    path = path.substring(1);
+  }
+  
+  // Make the path more generic by removing all position indices
+  // This is important for matching multiple similar elements
+  const genericPath = path.replace(/\[\d+\]/g, '');
+  
+  // For debugging
+  console.log({
+    original: path,
+    generic: genericPath
+  });
+  
+  return genericPath;
+}
+
+// Function to find all elements matching a relative XPath within a root element
+function findMatchingElements(relativeXPath: string, rootEl: Element): Element[] {
+  if (!relativeXPath || !rootEl) return [];
+  
+  try {
+    // Create an XPath expression relative to the root element
+    // Make the expression more generic by adding wildcards for indices
+    // This way we match all elements with the same path pattern
+    // For example, convert "li/div/div/h3" to "./li/div/div/h3"
+    const genericXPath = `./${relativeXPath}`;
+    
+    debug('Searching with XPath:', genericXPath);
+    
+    // Evaluate the XPath
+    const result = document.evaluate(
+      genericXPath,
+      rootEl,
+      null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+      null
+    );
+    
+    // Convert result to array
+    const elements: Element[] = [];
+    for (let i = 0; i < result.snapshotLength; i++) {
+      const element = result.snapshotItem(i) as Element;
+      if (element) {
+        elements.push(element);
+      }
+    }
+    
+    debug(`Found ${elements.length} matching elements with direct XPath`);
+    
+    // If we didn't find any elements with the exact path, try a more flexible approach
+    if (elements.length === 0) {
+      // Extract the tag name from the end of the path
+      const lastTagMatch = relativeXPath.match(/\/([^\/]+)$/);
+      if (lastTagMatch && lastTagMatch[1]) {
+        const lastTag = lastTagMatch[1];
+        debug(`Trying more flexible match for tag: ${lastTag}`);
+        
+        // Try to find all elements with this tag
+        const similarElements = Array.from(rootEl.querySelectorAll(lastTag));
+        debug(`Found ${similarElements.length} elements with tag ${lastTag}`);
+        
+        // Filter to elements that are somewhat similar in structure to what we want
+        const pathParts = relativeXPath.split('/');
+        return similarElements.filter(el => {
+          // This is a simplistic heuristic - we check if this element
+          // has at least some of the parent structure we expect
+          let currentEl = el;
+          let level = 0;
+          for (let i = pathParts.length - 2; i >= 0 && level < 3; i--, level++) {
+            currentEl = currentEl.parentElement as Element;
+            if (!currentEl) return false;
+            
+            // Check if this parent element tag matches the expected tag from the path
+            const expectedTag = pathParts[i].replace(/\[\d+\]/, '');
+            if (currentEl.tagName.toLowerCase() !== expectedTag) {
+              return false;
+            }
+          }
+          return true;
+        });
+      }
+    }
+    
+    return elements;
+  } catch (error) {
+    console.error('Error finding matching elements:', error);
+    return [];
+  }
+}
+
+// Function to highlight all matching elements
+function highlightMatchingElements(elements: Element[]): void {
+  // Clear any existing highlights
+  clearMatchingHighlights();
+  
+  // Create highlights for each matching element
+  matchingElements = elements;
+  matchingOverlays = elements.map(element => {
+    const highlightEl = document.createElement('div');
+    highlightEl.style.position = 'absolute';
+    highlightEl.style.border = '2px dashed #1a73e8';
+    highlightEl.style.backgroundColor = 'rgba(26, 115, 232, 0.05)';
+    highlightEl.style.pointerEvents = 'none';
+    highlightEl.style.zIndex = '9999';
+    
+    // Position the highlight
+    const rect = element.getBoundingClientRect();
+    highlightEl.style.top = `${rect.top + window.scrollY}px`;
+    highlightEl.style.left = `${rect.left + window.scrollX}px`;
+    highlightEl.style.width = `${rect.width}px`;
+    highlightEl.style.height = `${rect.height}px`;
+    
+    document.body.appendChild(highlightEl);
+    return highlightEl;
+  });
+}
+
+// Function to clear all matching highlights
+function clearMatchingHighlights(): void {
+  matchingOverlays.forEach(overlay => {
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  });
+  matchingOverlays = [];
+}
+
+// Function to update matching highlights positions (for scrolling)
+function updateMatchingHighlightsPositions(): void {
+  if (matchingElements.length !== matchingOverlays.length) return;
+  
+  matchingElements.forEach((element, index) => {
+    const overlay = matchingOverlays[index];
+    if (element && overlay) {
+      const rect = element.getBoundingClientRect();
+      overlay.style.top = `${rect.top + window.scrollY}px`;
+      overlay.style.left = `${rect.left + window.scrollX}px`;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+    }
+  });
+}
 
 // Function to activate selection mode
 function activateSelectionMode(): void {
@@ -442,10 +824,73 @@ function activateSelectionMode(): void {
   });
 }
 
+// Function to activate list item selection mode
+function activateListItemSelectionMode(rootXPathValue: string): void {
+  // First activate normal selection mode
+  activateSelectionMode();
+  
+  // Set list item selection specific state
+  isListItemSelectionMode = true;
+  rootXPath = rootXPathValue;
+  
+  debug('Activating list item selection mode with root XPath:', rootXPathValue);
+  
+  // Find root element from XPath
+  try {
+    const rootResult = document.evaluate(
+      rootXPathValue,
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    
+    rootElement = rootResult.singleNodeValue as Element;
+    
+    if (!rootElement) {
+      console.error('Root element not found with XPath:', rootXPathValue);
+      deactivateSelectionMode();
+      return;
+    }
+    
+    debug('Found root element:', {
+      tag: rootElement.tagName,
+      childCount: rootElement.childElementCount,
+      html: rootElement.outerHTML.substring(0, 100) + '...'
+    });
+    
+    // Highlight the root element with a different color to show its active
+    const rootHighlight = document.createElement('div');
+    rootHighlight.style.position = 'absolute';
+    rootHighlight.style.border = '2px solid #34a853';
+    rootHighlight.style.backgroundColor = 'rgba(52, 168, 83, 0.05)';
+    rootHighlight.style.pointerEvents = 'none';
+    rootHighlight.style.zIndex = '9998';
+    
+    const rect = rootElement.getBoundingClientRect();
+    rootHighlight.style.top = `${rect.top + window.scrollY}px`;
+    rootHighlight.style.left = `${rect.left + window.scrollX}px`;
+    rootHighlight.style.width = `${rect.width}px`;
+    rootHighlight.style.height = `${rect.height}px`;
+    
+    document.body.appendChild(rootHighlight);
+    
+    // Store the root highlight to remove it later
+    matchingOverlays.push(rootHighlight);
+    
+  } catch (error) {
+    console.error('Error finding root element:', error);
+    deactivateSelectionMode();
+  }
+}
+
 // Function to deactivate selection mode
 function deactivateSelectionMode(): void {
   isSelectionActive = false;
   isScrollingMode = false;
+  isListItemSelectionMode = false;
+  rootElement = null;
+  rootXPath = '';
   
   // Remove event listeners
   document.removeEventListener('mouseover', handlers.mouseOver, true);
@@ -457,6 +902,9 @@ function deactivateSelectionMode(): void {
   
   // Remove highlight overlay
   overlay.remove();
+  
+  // Clear matching highlights
+  clearMatchingHighlights();
   
   // Send message to side panel that selection mode is inactive
   chrome.runtime.sendMessage({
@@ -477,6 +925,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'activateSelectionMode':
       activateSelectionMode();
       sendResponse({ success: true });
+      break;
+      
+    case 'activateListItemSelectionMode':
+      if (message.rootXPath) {
+        activateListItemSelectionMode(message.rootXPath);
+        sendResponse({ success: true });
+      } else {
+        console.error('No root XPath provided for list item selection mode');
+        sendResponse({ success: false, error: 'No root XPath provided' });
+      }
       break;
       
     case 'deactivateSelectionMode':

@@ -23,6 +23,29 @@ export function startElementSelection(): Promise<boolean> {
   });
 }
 
+// Function to start list item selection with a root element
+export function startListItemSelection(rootXPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'startListItemSelection', rootXPath }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error starting list item selection:', chrome.runtime.lastError);
+        useJsonBuilderStore.getState().resetSelection();
+        resolve(false);
+        return;
+      }
+      
+      if (response?.success) {
+        console.log('List item selection started with root XPath:', rootXPath);
+        resolve(true);
+      } else {
+        console.error('Failed to start list item selection:', response?.error || 'Unknown error');
+        useJsonBuilderStore.getState().resetSelection();
+        resolve(false);
+      }
+    });
+  });
+}
+
 // Function to stop element selection
 export function stopElementSelection(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -89,10 +112,21 @@ export function setupElementSelectionListeners(): void {
           sendResponse({ success: true });
         } else if (jsonStore.isItemSelectionActive && message.data) {
           // Add the selected item to the list
-          jsonStore.addSelectedItemValue(
-            message.data.text || '',
-            message.data.fullXPath
-          );
+          if (message.data.isListItem && message.data.matchingValues && message.data.relativeXPath) {
+            // For list items with multiple matching values
+            jsonStore.addSelectedItemValue(
+              message.data.text || '',
+              message.data.fullXPath,
+              message.data.relativeXPath,
+              message.data.matchingValues
+            );
+          } else {
+            // Legacy case - single item
+            jsonStore.addSelectedItemValue(
+              message.data.text || '',
+              message.data.fullXPath
+            );
+          }
           // Clear the live preview
           uiStore.setLivePreviewInfo(null);
           // Send response to prevent message port closed error
@@ -123,6 +157,13 @@ export function setupElementSelectionListeners(): void {
             xpath: message.data.xpath,
             fullXPath: message.data.fullXPath
           };
+          
+          // Add list-specific information if available
+          if (message.data.relativeXPath) {
+            previewInfo.relativeXPath = message.data.relativeXPath;
+            previewInfo.matchingCount = message.data.matchingCount;
+          }
+          
           uiStore.setLivePreviewInfo(previewInfo);
           uiStore.setShowLivePreview(true);
           // Send response to prevent message port closed error
